@@ -16,7 +16,7 @@ const FRIENDS = [
 ];
 
 function farm() {
-  const crop = (species) => ({ species, plantedAt: 0, progress: 0, moisture: 40, ripeMinutes: 0, withered: false, color: species === "rice" ? "gold" : "red" });
+  const crop = (species) => ({ species, plantedAt: 0, progress: 0, moisture: 40, color: species === "rice" ? "gold" : "red" });
   return {
     meta: { gameMinutes: 0, playSeconds: 0, timeScale: 30 },
     plots: [
@@ -61,10 +61,11 @@ test("친구들이 물을 주고 다 자란 작물을 수확해 창고에 넣는
   assert(report.friends.haneul.harvest.tomato === 3, "하늘이가 토마토 수확");
 });
 
-test("돌봐 줄 친구가 없으면 작물이 시든다", () => {
+test("돌봐 줄 친구가 없어도 작물은 다 자란 채로 기다린다", () => {
   const state = farm();
   simulateOffline(state, speciesById, [], 5 * 24 * 60);
-  assert(state.plots[0].crop.withered, "시들어야 해요");
+  assert(state.plots[0].crop.progress === 1, "다 자라 있어야 해요");
+  assert(!state.inventory.tomato, "수확은 하지 않아요");
 });
 
 test("나눠서 처리해도 한 번에 처리한 것과 같다", () => {

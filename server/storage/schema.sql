@@ -23,8 +23,6 @@ CREATE TABLE IF NOT EXISTS crops (
     planted_at   REAL    NOT NULL,  -- 심은 게임 시각(분)
     progress     REAL    NOT NULL,  -- 0 ~ 1, 1이면 다 자람
     moisture     REAL    NOT NULL,  -- 흙의 수분 0 ~ 100
-    ripe_minutes REAL    NOT NULL,  -- 다 자란 뒤 지난 게임 시간(분)
-    withered     INTEGER NOT NULL,  -- 1이면 시듦
     color        TEXT    NOT NULL DEFAULT ''  -- 열매·꽃 색 (data/crops.json 의 colors id)
 );
 

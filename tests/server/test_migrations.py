@@ -30,6 +30,7 @@ def make_v1_save(farm, tamper=False):
         conn.executescript(V1_SCHEMA)
         conn.executemany("INSERT INTO plots VALUES (?, ?, ?, ?)", [(0, 0, 0, "field"), (1, 1, 0, "paddy"), (2, 2, 0, "flowerbed")])
         conn.execute("INSERT INTO crops VALUES (2, 'tulip', 0, 0.5, 50, 0, 0)")
+        conn.execute("INSERT INTO crops VALUES (0, 'tomato', 0, 1.0, 20, 400, 1)")  # 시들었던 토마토
         conn.execute("INSERT INTO inventory VALUES ('seed_tulip', 3)")
         for k, v in {"schemaVersion": 1, "createdAt": 1, "lastSavedAt": 1, "lastLaunchAt": 1,
                      "gameMinutes": 10, "playSeconds": 5, "timeScale": 30}.items():
@@ -41,6 +42,7 @@ def make_v1_save(farm, tamper=False):
 
 class MigrationTest(unittest.TestCase):
     def test_v1_save_is_upgraded_and_stays_valid(self):
+        # 1 → 2 (색 추가) → 3 (시듦 제거, 시든 작물은 수확할 수 있게 되살림)
         with TempFarm() as farm:
             make_v1_save(farm)
             store = farm.store()
@@ -49,6 +51,7 @@ class MigrationTest(unittest.TestCase):
             self.assertEqual(state["meta"]["schemaVersion"], db.SCHEMA_VERSION)
             self.assertEqual([p["border"] for p in state["plots"]], ["oak", "stream", "bark"])
             self.assertEqual(state["plots"][2]["crop"]["color"], "pink")  # 튤립의 첫 번째 색
+            self.assertEqual(state["plots"][0]["crop"], {"species": "tomato", "plantedAt": 0.0, "progress": 1.0, "moisture": 20.0, "color": "red"})
             self.assertEqual(state["inventory"]["seed_tulip"], 3)
 
     def test_tampered_v1_save_stays_tampered(self):

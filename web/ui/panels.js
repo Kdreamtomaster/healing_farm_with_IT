@@ -94,13 +94,9 @@ function plotInfo(plot, state, data, actions) {
       el("div", { class: "meter-fill", style: `width:${moisture}%` }),
     ),
     el("p", { class: "hint" }, `수분 ${moisture} (좋아하는 범위 ${low}~${high})`),
-    stage === "withered"
-      ? el("button", { onclick: actions.clear }, "시든 작물 정리")
-      : [
-          el("button", { onclick: actions.water }, "물주기"),
-          plot.kind === "paddy" && el("button", { onclick: actions.flood }, "논에 물대기"),
-          el("button", { onclick: actions.harvest, disabled: stage !== "ripe" }, "수확"),
-        ],
+    el("button", { onclick: actions.water }, "물주기"),
+    plot.kind === "paddy" && el("button", { onclick: actions.flood }, "논에 물대기"),
+    el("button", { onclick: actions.harvest, disabled: stage !== "ripe" }, "수확"),
   );
 }
 

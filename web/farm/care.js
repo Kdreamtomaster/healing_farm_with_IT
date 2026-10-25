@@ -5,14 +5,14 @@ export const WATER_AMOUNT = 40; // 물뿌리개 한 번에 오르는 수분
 
 // 물을 줄 수 있으면 주고 true 를 돌려줍니다.
 export function water(plot) {
-  if (!plot.crop || plot.crop.withered) return false;
+  if (!plot.crop) return false;
   plot.crop = { ...plot.crop, moisture: Math.min(100, plot.crop.moisture + WATER_AMOUNT) };
   return true;
 }
 
 // 논에 물을 가득 채웁니다.
 export function flood(plot) {
-  if (plot.kind !== "paddy" || !plot.crop || plot.crop.withered) return false;
+  if (plot.kind !== "paddy" || !plot.crop) return false;
   plot.crop = { ...plot.crop, moisture: 100 };
   return true;
 }
@@ -40,7 +40,7 @@ export function bulkCare(state, speciesById, kind) {
   const { match, action } = BULK[kind];
   let count = 0;
   for (const plot of state.plots) {
-    if (plot.crop && !plot.crop.withered && match(plot, speciesById.get(plot.crop.species))) {
+    if (plot.crop && match(plot, speciesById.get(plot.crop.species))) {
       if (action(plot)) count += 1;
     }
   }

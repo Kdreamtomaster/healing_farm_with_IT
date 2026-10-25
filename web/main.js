@@ -3,7 +3,7 @@ import { loadFriends, loadManifest, loadPalette, loadSpecies, loadState, saveSta
 import { applyBorderToKind, setBorder } from "./decor/plots-style.js";
 import { bulkCare, BULK, flood, water } from "./farm/care.js";
 import { advanceFarm } from "./farm/crops.js";
-import { clearWithered, harvest, plant } from "./farm/harvest.js";
+import { harvest, plant } from "./farm/harvest.js";
 import { playSound, setSound, unlockAudio } from "./sound/engine.js";
 import { PLOT_NAMES } from "./text.js";
 import { startAutosave } from "./time/autosave.js";
@@ -94,10 +94,6 @@ const actions = {
     const plot = selectedPlot();
     const species = speciesById.get(plot.crop.species);
     report(harvest(game.state, plot, species), "harvest", `${plot.id}:${species.id}`, "harvest");
-  },
-  clear() {
-    const plot = selectedPlot();
-    report(clearWithered(plot), "clear", `${plot.id}`);
   },
   bulk(kind) {
     const count = bulkCare(game.state, speciesById, kind);
@@ -208,7 +204,7 @@ function draw() {
   const key = JSON.stringify([
     game.selectedId,
     plot?.border,
-    crop && [crop.species, crop.withered, Math.floor(crop.progress * 100), Math.round(crop.moisture)],
+    crop && [crop.species, Math.floor(crop.progress * 100), Math.round(crop.moisture)],
     game.state.inventory,
     game.state.meta.timeScale,
   ]);

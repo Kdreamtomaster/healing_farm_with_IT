@@ -20,7 +20,27 @@ def _v1_to_v2(conn: sqlite3.Connection, game_data: dict) -> None:
         conn.execute("UPDATE crops SET color = ? WHERE species = ?", (species["colors"][0]["id"], species["id"]))
 
 
-STEPS = {1: _v1_to_v2}
+def _v2_to_v3(conn: sqlite3.Connection, game_data: dict) -> None:
+    """시듦 기능을 뺐습니다. 힐링 게임이라 다 자란 작물은 수확할 때까지 기다려 줘요.
+
+    SQLite 는 칸을 지우는 기능이 오래된 버전에는 없어서, 새 표를 만들어 옮겨 담고 이름을 바꿉니다.
+    이미 시들었던 작물은 다시 수확할 수 있는 상태로 되살립니다.
+    """
+    conn.execute(
+        "CREATE TABLE crops_new ("
+        " plot_id INTEGER PRIMARY KEY REFERENCES plots(id), species TEXT NOT NULL, planted_at REAL NOT NULL,"
+        " progress REAL NOT NULL, moisture REAL NOT NULL, color TEXT NOT NULL DEFAULT '')"
+    )
+    conn.execute(
+        "INSERT INTO crops_new (plot_id, species, planted_at, progress, moisture, color)"
+        " SELECT plot_id, species, planted_at, CASE WHEN withered = 1 THEN 1.0 ELSE progress END, moisture, color"
+        " FROM crops"
+    )
+    conn.execute("DROP TABLE crops")
+    conn.execute("ALTER TABLE crops_new RENAME TO crops")
+
+
+STEPS = {1: _v1_to_v2, 2: _v2_to_v3}
 
 
 def upgrade(conn: sqlite3.Connection, from_version: int, game_data: dict) -> None:

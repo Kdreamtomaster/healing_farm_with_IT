@@ -18,8 +18,6 @@ def planted_state(store):
         "plantedAt": 10,
         "progress": 0.25,
         "moisture": 62.5,
-        "ripeMinutes": 0,
-        "withered": False,
         "color": "yellow",
     }
     state["plots"][0]["border"] = "rose"

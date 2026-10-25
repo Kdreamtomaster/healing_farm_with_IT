@@ -32,9 +32,9 @@ python -m unittest discover -s tests/server -t tests/server
 |---|---|
 | `server/test_storage.py` | 한글 경로 새 농장, 저장 후 재실행 복원, 구획 배치 변경 거부, 깨진 파일 백업 복구, 백업 5개 유지 |
 | `server/test_integrity.py` | 지문 계산, 세이브 직접 수정 감지와 저장 잠금, 키 삭제 감지 |
-| `server/test_migrations.py` | 옛 버전 세이브 옮기기, 변조된 옛 세이브는 계속 변조, 더 새 버전 거부 |
+| `server/test_migrations.py` | 옛 버전 세이브 옮기기(1→2→3, 시든 작물 되살리기), 변조된 옛 세이브는 계속 변조, 더 새 버전 거부 |
 | `server/test_api.py` | 경로 조작 차단, 입력 검증, 다른 웹사이트 요청 차단, 저장 왕복 |
-| `web/farm.test.js` | 성장, 수분, 시듦, 심기, 수확, 일괄 관리 |
+| `web/farm.test.js` | 성장, 수분, 다 자란 작물은 계속 기다림, 심기, 수확, 일괄 관리 |
 | `web/decor.test.js` | 계절 달력, 테두리 색, 작물 색 고르기 |
 | `web/sound.test.js` | 음 이름 → 진동수, 효과음·배경음이 실제로 소리를 내는지 (스피커 없이 미리 만들어 확인) |
 | `web/time.test.js` | 비운 시간 0·음수·5일 초과, 배율, 친구들의 물주기·수확, 나눠 처리해도 같은 결과, 안내 문장 |

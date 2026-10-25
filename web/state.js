@@ -2,7 +2,7 @@
 //
 // state = {
 //   meta: { gameMinutes, playSeconds, timeScale, lastSavedAt, createdAt, ... },
-//   plots: [{ id, x, y, kind, crop: null | { species, plantedAt, progress, moisture, ripeMinutes, withered } }],
+//   plots: [{ id, x, y, kind, crop: null | { species, plantedAt, progress, moisture, color } }],
 //   inventory: { seed_tomato: 4, tomato: 3, ... },
 // }
 // 이 모양 그대로 서버에 저장되고 다시 불러와집니다.

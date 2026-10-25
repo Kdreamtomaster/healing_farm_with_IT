@@ -88,16 +88,11 @@ def _crop(raw, colors: dict, where: str) -> dict:
         raise ValidationError(f"{where}.species 는 data/crops.json 에 없는 작물이에요")
     if crop.get("color") not in colors[crop["species"]]:
         raise ValidationError(f"{where}.color 는 이 작물에 없는 색이에요")
-    withered = crop.get("withered")
-    if not isinstance(withered, bool):
-        raise ValidationError(f"{where}.withered 는 true/false 여야 해요")
     return {
         "species": crop["species"],
         "plantedAt": _number(crop.get("plantedAt"), f"{where}.plantedAt", 0, 1e12),
         "progress": _number(crop.get("progress"), f"{where}.progress", 0, 1),
         "moisture": _number(crop.get("moisture"), f"{where}.moisture", 0, 100),
-        "ripeMinutes": _number(crop.get("ripeMinutes"), f"{where}.ripeMinutes", 0, 1e12),
-        "withered": withered,
         "color": crop["color"],
     }
 

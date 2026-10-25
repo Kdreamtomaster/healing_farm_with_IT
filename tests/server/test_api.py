@@ -56,7 +56,7 @@ class ValidationTest(unittest.TestCase):
     def test_rejects_unknown_species(self):
         state = self.state()
         state["plots"][0]["crop"] = {
-            "species": "gold", "plantedAt": 0, "progress": 0, "moisture": 0, "ripeMinutes": 0, "withered": False,
+            "species": "gold", "plantedAt": 0, "progress": 0, "moisture": 0,
             "color": "red",
         }
         self.assert_rejected(state)
@@ -64,7 +64,7 @@ class ValidationTest(unittest.TestCase):
     def test_rejects_color_the_crop_does_not_have(self):
         state = self.state()
         state["plots"][0]["crop"] = {
-            "species": "rice", "plantedAt": 0, "progress": 0, "moisture": 0, "ripeMinutes": 0, "withered": False,
+            "species": "rice", "plantedAt": 0, "progress": 0, "moisture": 0,
             "color": "purple",
         }
         self.assert_rejected(state)

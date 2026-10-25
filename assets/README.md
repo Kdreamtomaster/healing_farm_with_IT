@@ -26,13 +26,12 @@ assets/
 │   ├── tomato_seed_1.png
 │   ├── tomato_sprout_1.png, tomato_sprout_2.png
 │   ├── tomato_growing_1.png, tomato_growing_2.png
-│   ├── tomato_ripe_1.png, tomato_ripe_2.png
-│   └── tomato_withered_1.png   (감자 potato, 벼 rice, 튤립 tulip 도 같은 규칙)
+│   └── tomato_ripe_1.png, tomato_ripe_2.png   (감자 potato, 벼 rice, 튤립 tulip 도 같은 규칙)
 └── effects/
     └── drop_1.png    ← 목마른 작물 위 물방울
 ```
 - 형식: `대상_단계_프레임.png` (모두 영어 소문자와 `_`)
-- 단계: `seed` 씨앗 / `sprout` 새싹 / `growing` 자라는 중 / `ripe` 다 자람 / `withered` 시듦
+- 단계: `seed` 씨앗 / `sprout` 새싹 / `growing` 자라는 중 / `ripe` 다 자람
 - 프레임 2장은 번갈아 보여 바람에 흔들리는 것처럼 보임 (윗부분을 한 칸 옆으로 민 그림)
 
 ## 그림 고치는 법
@@ -41,7 +40,7 @@ assets/
 3. 열매·꽃처럼 **작물 색으로 바뀌어야 하는 곳은 `#ff00ff`, `#b000b0`** 으로 칠하기
 
 ## 새 작물 그림 추가하는 법
-1. 위 규칙대로 8장 그리기 (`{id}_seed_1` … `{id}_withered_1`)
+1. 위 규칙대로 7장 그리기 (`{id}_seed_1` … `{id}_ripe_2`)
 2. `manifest.json` 의 `crops.ids` 에 작물 id 추가
 3. `data/crops.json` 에 작물 정보 추가
 

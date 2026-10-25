@@ -1,7 +1,7 @@
 // web/farm/ 규칙 테스트
 import { bulkCare } from "../../web/farm/care.js";
 import { advanceCrop, DRY_PER_MINUTE, stageOf } from "../../web/farm/crops.js";
-import { clearWithered, harvest, plant } from "../../web/farm/harvest.js";
+import { harvest, plant } from "../../web/farm/harvest.js";
 import { assert, assertNear, test } from "./runner.js";
 
 // 테스트용 작물: 계산하기 쉽게 10분 만에 다 자라도록
@@ -9,7 +9,7 @@ const SPROUTY = { id: "sprouty", name: { ko: "새싹이" }, type: "field", water
 const RICE = { id: "rice", name: { ko: "벼" }, type: "paddy", water: "high", growMinutes: 10, yield: 5, seeds: 2, colors: [{ id: "gold", name: "황금", hex: "#ffff00" }] };
 const speciesById = new Map([SPROUTY, RICE].map((s) => [s.id, s]));
 
-const crop = (fields = {}) => ({ species: "sprouty", plantedAt: 0, progress: 0, moisture: 50, ripeMinutes: 0, withered: false, color: "red", ...fields });
+const crop = (fields = {}) => ({ species: "sprouty", plantedAt: 0, progress: 0, moisture: 50, color: "red", ...fields });
 
 function newState() {
   return {
@@ -32,12 +32,11 @@ test("수분이 알맞으면 성장 시간이 지나면 다 자란다", () => {
 test("수분이 맞지 않으면 느리게 자란다 (죽지는 않는다)", () => {
   const grown = advanceCrop(crop({ moisture: 0 }), SPROUTY, "field", 10);
   assertNear(grown.progress, 0.4, "성장도", 1e-6);
-  assert(!grown.withered, "시들면 안 돼요");
 });
 
-test("다 자란 뒤 오래 두면 시든다", () => {
-  const grown = advanceCrop(crop(), SPROUTY, "field", 10 + 15);
-  assert(grown.withered, "시들어야 해요");
+test("다 자란 작물은 아무리 오래 둬도 수확할 때까지 기다린다", () => {
+  const grown = advanceCrop(crop(), SPROUTY, "field", 10 * 24 * 60); // 게임 열흘
+  assert(stageOf(grown) === "ripe", "계속 수확 가능해야 해요");
 });
 
 test("흙은 시간이 지나면 마르고, 논은 더 천천히 마른다", () => {
@@ -52,8 +51,7 @@ test("나눠서 계산해도 한 번에 계산한 것과 같다", () => {
   let stepwise = crop();
   for (let i = 0; i < 60; i++) stepwise = advanceCrop(stepwise, SPROUTY, "field", 0.5);
   const once = advanceCrop(crop(), SPROUTY, "field", 30);
-  for (const key of ["progress", "moisture", "ripeMinutes"]) assertNear(stepwise[key], once[key], key, 1e-6);
-  assert(stepwise.withered === once.withered, "시듦 여부가 달라요");
+  for (const key of ["progress", "moisture"]) assertNear(stepwise[key], once[key], key, 1e-6);
 });
 
 test("원래 작물은 바뀌지 않는다", () => {
@@ -85,13 +83,10 @@ test("다 자란 작물을 수확하면 수확물과 씨앗이 들어오고 칸�
   assert(state.plots[0].crop === null, "칸이 비어야 해요");
 });
 
-test("덜 자란 작물과 시든 작물은 수확되지 않는다", () => {
+test("덜 자란 작물은 수확되지 않는다", () => {
   const state = newState();
   state.plots[0].crop = crop({ progress: 0.9 });
-  state.plots[1].crop = crop({ progress: 1, withered: true });
   assert(!harvest(state, state.plots[0], SPROUTY).ok, "덜 자람");
-  assert(!harvest(state, state.plots[1], SPROUTY).ok, "시듦");
-  assert(clearWithered(state.plots[1]).ok && state.plots[1].crop === null, "시든 작물은 정리돼요");
 });
 
 test("목마른 작물에만 일괄 물주기", () => {

@@ -13,5 +13,4 @@ export const STAGE_NAMES = {
   sprout: "새싹",
   growing: "자라는 중",
   ripe: "수확 가능",
-  withered: "시듦",
 };
