@@ -21,6 +21,9 @@ export async function loadSprites(manifest) {
       for (let f = 1; f <= count; f++) entries.push([`${id}_${stage}_${f}`, `crops/${id}_${stage}_${f}.png`]);
     }
   }
+  for (const [name, count] of Object.entries(manifest.actors)) {
+    for (let f = 1; f <= count; f++) entries.push([`${name}_${f}`, `actors/${name}_${f}.png`]);
+  }
   const images = Object.fromEntries(await Promise.all(entries.map(async ([key, src]) => [key, await loadImage(src)])));
   const drop = await loadImage(manifest.effects.drop);
   const markers = { main: hexToRgb(manifest.recolor.main), shade: hexToRgb(manifest.recolor.shade) };
@@ -28,6 +31,10 @@ export async function loadSprites(manifest) {
 
   return {
     drop,
+    // 농부·드론 같은 등장인물. 색을 바꾸지 않고 그대로 그려요.
+    actor(name, frame) {
+      return images[`${name}_${(frame % manifest.actors[name]) + 1}`];
+    },
     // frame 은 0, 1, 2 … 아무 숫자나 넣으면 그 단계의 그림 수에 맞춰 돌아가요.
     crop(id, stage, frame, hex) {
       const key = `${id}_${stage}_${(frame % frames[stage]) + 1}`;

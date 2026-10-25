@@ -1,7 +1,7 @@
 // 게임 시작점: 데이터와 세이브를 불러와 비운 시간을 처리하고, 1초마다 농장의 시간을 흘려보냅니다.
 import { loadFriends, loadManifest, loadPalette, loadSpecies, loadState, saveState } from "./api.js";
 import { applyBorderToKind, setBorder } from "./decor/plots-style.js";
-import { bulkCare, BULK, flood, water } from "./farm/care.js";
+import { BULK, bulkTargets, flood, water } from "./farm/care.js";
 import { advanceFarm } from "./farm/crops.js";
 import { harvest, plant } from "./farm/harvest.js";
 import { playSound, setSound, unlockAudio } from "./sound/engine.js";
@@ -10,6 +10,7 @@ import { startAutosave } from "./time/autosave.js";
 import { MINUTES_PER_DAY, realMsToGameMinutes } from "./time/clock.js";
 import { newReport, planOffline, simulateOffline } from "./time/offline.js";
 import { reportToLog, summarize } from "./time/summary.js";
+import { createAnimator } from "./ui/animations.js";
 import { hideLoading, showProgress, showSummary } from "./ui/loading.js";
 import { renderHeader, renderPanel } from "./ui/panels.js";
 import { drawFarm, farmSize, plotAt, ZOOM } from "./ui/renderer.js";
@@ -21,7 +22,7 @@ const AWAY_GAP_MS = 2 * 60 * 1000;
 // 이보다 짧게 비운 건 안내 화면을 띄우지 않아요.
 const AWAY_NOTICE_MS = 60 * 1000;
 const MAX_LOG_PER_SAVE = 500; // 서버가 한 번에 받는 작업 기록 수
-const FRAME_MS = 1000 / 12; // 도트 게임답게 1초에 12번만 다시 그려요
+const FRAME_MS = 1000 / 24; // 1초에 24번 다시 그려요 (도트 느낌은 살리고, 움직임은 부드럽게)
 
 const canvas = document.getElementById("farm");
 const ctx = canvas.getContext("2d");
@@ -37,6 +38,7 @@ const [speciesList, friends, palette, manifest, boot] = await Promise.all([
 const sprites = await loadSprites(manifest);
 const speciesById = new Map(speciesList.map((s) => [s.id, s]));
 const data = { speciesList, speciesById, palette };
+const animator = createAnimator(); // 농부, 드론, 스프링클러, 물길 연출
 
 const game = {
   state: boot.state,
@@ -82,23 +84,40 @@ const actions = {
   preview(speciesId, colorId) {
     game.preview = speciesId ? { plotId: game.selectedId, speciesId, colorId } : null;
   },
+  // 농부가 걸어가서 물을 줘요. 흙이 젖는 건 물뿌리개를 기울이는 순간이에요.
   water() {
     const plot = selectedPlot();
-    report(water(plot) ? { ok: true, message: "물을 줬어요" } : { ok: false, message: "물을 줄 작물이 없어요" }, "water", `${plot.id}`, "water");
+    if (!plot.crop) return report({ ok: false, message: "물을 줄 작물이 없어요" });
+    animator.farmerWater(plot, (p) =>
+      report(water(p) ? { ok: true, message: "물을 줬어요" } : { ok: false, message: "물을 줄 작물이 없어요" }, "water", `${p.id}`, "water"),
+    );
   },
   flood() {
     const plot = selectedPlot();
-    report(flood(plot) ? { ok: true, message: "논에 물을 가득 채웠어요" } : { ok: false, message: "물을 댈 수 없어요" }, "flood", `${plot.id}`, "water");
+    if (!plot.crop) return report({ ok: false, message: "물을 댈 수 없어요" });
+    animator.farmerWater(plot, (p) =>
+      report(flood(p) ? { ok: true, message: "논에 물을 가득 채웠어요" } : { ok: false, message: "물을 댈 수 없어요" }, "flood", `${p.id}`, "water"),
+    );
   },
   harvest() {
     const plot = selectedPlot();
     const species = speciesById.get(plot.crop.species);
     report(harvest(game.state, plot, species), "harvest", `${plot.id}:${species.id}`, "harvest");
   },
+  // 일괄 관리는 기계가 도와줘요: 목마른 작물은 드론, 물 많이 먹는 작물은 스프링클러, 논은 물길
   bulk(kind) {
-    const count = bulkCare(game.state, speciesById, kind);
-    const message = count ? `${BULK[kind].label}: ${count}칸` : `${BULK[kind].label}: 해당하는 칸이 없어요`;
-    report({ ok: count > 0, message }, `bulk:${kind}`, `${count}`, "water");
+    const targets = bulkTargets(game.state, speciesById, kind);
+    if (!targets.length) return report({ ok: false, message: `${BULK[kind].label}: 해당하는 칸이 없어요` });
+    const helper = BULK_HELPERS[kind];
+    let count = 0;
+    const apply = (plot) => {
+      if (BULK[kind].action(plot)) count += 1;
+      if (helper.dropSound) playSound(helper.dropSound);
+      draw();
+    };
+    const done = () => report({ ok: count > 0, message: `${helper.name}: ${BULK[kind].label} ${count}칸` }, `bulk:${kind}`, `${count}`);
+    playSound(helper.sound);
+    animator[helper.run](targets, apply, done, performance.now());
   },
   setBorder(borderId) {
     const plot = selectedPlot();
@@ -118,6 +137,12 @@ const actions = {
   setSound(change) {
     setSound(change);
   },
+};
+
+const BULK_HELPERS = {
+  thirsty: { run: "drone", name: "드론", sound: "drone", dropSound: "drip" },
+  highWater: { run: "sprinklers", name: "스프링클러", sound: "sprinkler" },
+  paddy: { run: "flow", name: "물길", sound: "flow" },
 };
 
 async function save({ silent = false, keepalive = false } = {}) {
@@ -214,12 +239,13 @@ function draw() {
   }
 }
 
-// 농장 그림은 따로, 1초에 12번 다시 그려요 (흔들리는 작물, 계절 효과)
+// 농장 그림은 따로 다시 그려요 (흔들리는 작물, 계절 효과, 물주기 연출)
 let lastFrame = 0;
 function animate(time) {
   if (time - lastFrame >= FRAME_MS) {
     lastFrame = time;
-    drawFarm(ctx, { ...data, sprites, state: game.state, selectedId: game.selectedId, preview: game.preview, time });
+    animator.update(time);
+    drawFarm(ctx, { ...data, sprites, animator, state: game.state, selectedId: game.selectedId, preview: game.preview, time });
   }
   requestAnimationFrame(animate);
 }

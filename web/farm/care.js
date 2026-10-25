@@ -36,13 +36,13 @@ export const BULK = {
   },
 };
 
+// 일괄 관리할 칸 고르기 (화면은 이 칸들을 차례로 돌며 드론·스프링클러 연출을 보여 줘요)
+export function bulkTargets(state, speciesById, kind) {
+  const { match } = BULK[kind];
+  return state.plots.filter((plot) => plot.crop && match(plot, speciesById.get(plot.crop.species)));
+}
+
+// 연출 없이 한 번에 일괄 관리. 바뀐 칸 수를 돌려줍니다.
 export function bulkCare(state, speciesById, kind) {
-  const { match, action } = BULK[kind];
-  let count = 0;
-  for (const plot of state.plots) {
-    if (plot.crop && match(plot, speciesById.get(plot.crop.species))) {
-      if (action(plot)) count += 1;
-    }
-  }
-  return count;
+  return bulkTargets(state, speciesById, kind).filter((plot) => BULK[kind].action(plot)).length;
 }

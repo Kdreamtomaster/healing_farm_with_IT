@@ -27,6 +27,10 @@ assets/
 │   ├── tomato_sprout_1.png, tomato_sprout_2.png
 │   ├── tomato_growing_1.png, tomato_growing_2.png
 │   └── tomato_ripe_1.png, tomato_ripe_2.png   (감자 potato, 벼 rice, 튤립 tulip 도 같은 규칙)
+├── actors/           ← 등장인물 (색을 바꾸지 않고 그대로 그림)
+│   ├── farmer_walk_1.png, farmer_walk_2.png   ← 걷는 농부 (오른쪽을 봄, 왼쪽은 뒤집어 그림)
+│   ├── farmer_pour_1.png, farmer_pour_2.png   ← 물뿌리개 기울이기
+│   └── drone_1.png, drone_2.png               ← 프로펠러가 도는 드론
 └── effects/
     └── drop_1.png    ← 목마른 작물 위 물방울
 ```

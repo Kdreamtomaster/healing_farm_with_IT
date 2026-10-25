@@ -14,6 +14,21 @@ export const EFFECTS = {
     { note: "C6", at: 0.09, len: 0.08, slideTo: "G5" },
     { note: "A5", at: 0.18, len: 0.1, slideTo: "E5" },
   ],
+  // 드론 출발: 위잉~ 하고 떠오르는 소리
+  drone: [
+    { note: "C4", at: 0, len: 0.35, slideTo: "G4", volume: 0.1 },
+    { note: "G4", at: 0.3, len: 0.25, slideTo: "C5", volume: 0.08 },
+  ],
+  // 드론이 칸에 물을 뿌릴 때: 작은 물방울 한 방울
+  drip: [{ note: "A6", at: 0, len: 0.06, slideTo: "E6", volume: 0.1 }],
+  // 스프링클러: 칙칙칙칙 돌아가는 소리
+  sprinkler: [0, 0.09, 0.18, 0.27, 0.36, 0.45, 0.54, 0.63].map((at, i) => ({ note: i % 2 ? "E6" : "G6", at, len: 0.04, volume: 0.07 })),
+  // 논 물대기: 물이 졸졸 흘러가는 소리
+  flow: [
+    { note: "G5", at: 0, len: 0.2, slideTo: "C5", wave: "triangle", volume: 0.2 },
+    { note: "A5", at: 0.18, len: 0.2, slideTo: "D5", wave: "triangle", volume: 0.2 },
+    { note: "C6", at: 0.36, len: 0.3, slideTo: "E5", wave: "triangle", volume: 0.2 },
+  ],
   // 수확: 도-미-솔-도 올라가는 소리
   harvest: [
     { note: "C5", at: 0, len: 0.08 },

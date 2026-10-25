@@ -29,7 +29,7 @@ test("효과음 악보의 음 이름이 모두 올바르다", () => {
   }
 });
 
-for (const name of ["plant", "water", "harvest", "save", "welcome"]) {
+for (const name of Object.keys(EFFECTS)) {
   test(`효과음 "${name}" 이 실제로 소리를 낸다`, async () => {
     const ctx = new OfflineAudioContext(1, RATE * 2, RATE);
     scheduleEffect(ctx, ctx.destination, name, 0);

@@ -1,5 +1,5 @@
 // web/farm/ 규칙 테스트
-import { bulkCare } from "../../web/farm/care.js";
+import { bulkCare, bulkTargets } from "../../web/farm/care.js";
 import { advanceCrop, DRY_PER_MINUTE, stageOf } from "../../web/farm/crops.js";
 import { harvest, plant } from "../../web/farm/harvest.js";
 import { assert, assertNear, test } from "./runner.js";
@@ -105,4 +105,13 @@ test("논 물대기는 논만 가득 채운다", () => {
   assert(bulkCare(state, speciesById, "paddy") === 1, "논 한 칸만");
   assert(state.plots[2].crop.moisture === 100, "논은 100");
   assert(state.plots[0].crop.moisture === 5, "밭은 그대로");
+});
+
+test("일괄 관리 대상 고르기는 아무것도 바꾸지 않는다", () => {
+  const state = newState();
+  state.plots[0].crop = crop({ moisture: 5 });
+  state.plots[1].crop = crop({ moisture: 30 });
+  const targets = bulkTargets(state, speciesById, "thirsty");
+  assert(targets.length === 1 && targets[0].id === 0, "목마른 칸 하나");
+  assert(state.plots[0].crop.moisture === 5, "고르기만 해요");
 });
