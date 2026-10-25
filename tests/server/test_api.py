@@ -133,6 +133,23 @@ class ServerTest(unittest.TestCase):
         _, data = self.request("GET", "/api/state")
         self.assertEqual(json.loads(data)["state"]["inventory"]["seed_potato"], 1)
 
+    def post(self, path, body):
+        status, data = self.request("POST", path, json.dumps(body), {"Content-Type": "application/json"})
+        return status, json.loads(data)
+
+    def test_reset_is_refused_for_a_healthy_farm(self):
+        status, data = self.post("/api/reset", {})
+        self.assertEqual(status, 409, data)
+
+    def test_lab_round_trip(self):
+        status, data = self.request("GET", "/api/lab/state")
+        lab = json.loads(data)
+        self.assertEqual((status, lab["integrity"], lab["samples"]), (200, "ok", []))
+        self.assertEqual(self.post("/api/lab/import", {"species": "dragonfruit", "count": 1})[0], 400)
+        self.assertEqual(self.post("/api/lab/import", {"species": "tomato", "count": 1})[0], 400, "창고에 토마토가 없어요")
+        self.assertEqual(self.post("/api/lab/experiment", {"sampleId": 1, "color": "red", "size": "big"})[0], 400)
+        self.assertEqual(self.post("/api/lab/clear", {})[0], 409, "멀쩡한 연구소는 비우지 않아요")
+
     def test_rejects_other_website(self):
         status, _ = self.request("POST", "/api/save", "{}", {"Origin": "http://evil.example"})
         self.assertEqual(status, 403)

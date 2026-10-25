@@ -40,7 +40,15 @@ def _v2_to_v3(conn: sqlite3.Connection, game_data: dict) -> None:
     conn.execute("ALTER TABLE crops_new RENAME TO crops")
 
 
-STEPS = {1: _v1_to_v2, 2: _v2_to_v3}
+def _v3_to_v4(conn: sqlite3.Connection, game_data: dict) -> None:
+    """7단계: 연구소와 주고받은 송장 번호를 기억하는 표가 생겼습니다."""
+    conn.execute(
+        "CREATE TABLE transfers (id TEXT PRIMARY KEY, kind TEXT NOT NULL, item TEXT NOT NULL,"
+        " amount INTEGER NOT NULL, at INTEGER NOT NULL)"
+    )
+
+
+STEPS = {1: _v1_to_v2, 2: _v2_to_v3, 3: _v3_to_v4}
 
 
 def upgrade(conn: sqlite3.Connection, from_version: int, game_data: dict) -> None:

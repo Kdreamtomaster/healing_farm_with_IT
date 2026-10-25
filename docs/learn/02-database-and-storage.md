@@ -16,7 +16,7 @@
 
 ## 게임 속에서는
 - 농장 전체가 `saves/farm.sqlite` 파일 하나에 저장돼요
-- 설계도: `server/storage/schema.sql` — 표 6개
+- 설계도: `server/storage/schema.sql` — 표 7개
   | 표 | 담는 것 |
   |---|---|
   | `meta` | 이름표-값 한 쌍씩: 게임 시각, 시간 배율, 마지막 저장 시각, 아는 작물 목록 … |
@@ -25,9 +25,11 @@
   | `inventory` | 창고: `tomato`, `seed_tomato`, `dish_caprese`, `craft_tulip_pot` … 와 개수 |
   | `task_log` | 작업 기록: 누가 언제 무엇을 했는지 (→ 04번 문서) |
   | `integrity` | 저장본의 지문 (→ 07번 문서) |
+  | `transfers` | 연구소와 주고받은 송장 번호 (→ 06번 문서) |
 - 읽고 쓰는 코드: `server/storage/db.py` 의 `read_state`, `write_game`
 - 값은 SQL 문장에 직접 이어 붙이지 않고 `?` 자리에 넣어요 → 08번 문서의 "SQL 인젝션 방지"
-- 마이그레이션: `server/storage/migrations.py` — 버전 1 → 2(색 추가) → 3(시듦 기능 제거)
+- 마이그레이션: `server/storage/migrations.py` — 버전 1 → 2(색 추가) → 3(시듦 기능 제거) → 4(연구소 송장 표)
+- 연구소는 아예 다른 파일 `saves/lab.sqlite` 예요 (`server/lab/schema.sql`)
 - 경로: `server/main.py` 의 `ROOT = Path(__file__).resolve().parent.parent` — 서버 파일 위치에서 프로젝트 폴더를 찾아요. 테스트(`tests/server/helpers.py`)는 일부러 `내 게임/힐링 농장` 같은 **한글·공백 폴더**에서 돌려 확인해요
 
 ## 실제 제품에서는

@@ -23,7 +23,8 @@ python server/main.py
    │
    ├─ 1. saves/ 폴더와 DB 준비 (없으면 새로 만들기, 깨졌으면 백업에서 복구)
    ├─ 2. "게임 실행 시 저장" — 실행 시각 기록
-   ├─ 3. 해시 검증 — 맞지 않으면 저장 잠금
+   ├─ 3. 해시 검증 — 맞지 않으면 저장 잠금 (화면이 메뚜기 떼를 보여 준 뒤 /api/reset 으로 완전 초기화)
+   ├─ 3-1. 연구소 송장 중 끊긴 것 이어 하기
    ├─ 4. http://127.0.0.1:8765 에서 대기 (포트를 쓸 수 없으면 빈 포트 사용)
    └─ 5. 브라우저 열기
 ```
@@ -35,6 +36,12 @@ python server/main.py
 | `GET  /web/…`, `/data/…`, `/assets/…`, `/tests/…` | 허용된 폴더의 파일 |
 | `GET  /api/state` | 농장 상태 + 무결성 결과(`ok`/`tampered`) + 복구 안내 + 서버 시각 |
 | `POST /api/save` | 농장 상태와 작업 기록 저장. 검증 실패 400, 저장 잠김 409 |
+| `POST /api/reset` | 완전 초기화. 지문이 맞지 않을(변조) 때만, 아니면 409 |
+| `GET  /api/lab/state` | 연구소 상태 + 정규화 글자·SHA-256·HMAC·연구소 키 |
+| `POST /api/lab/import` | 농장 작물 → 연구소 `{ species, count }` |
+| `POST /api/lab/fuel` | 실험 작물 → 바이오 연료 → 농장 `{ sampleId, count }` |
+| `POST /api/lab/experiment` | 실험 작물의 색·크기 바꾸기 `{ sampleId, color, size }` |
+| `POST /api/lab/clear` | 지문이 맞지 않는 연구소 비우기 |
 
 ## 파일
 | 파일 | 하는 일 |
@@ -43,7 +50,8 @@ python server/main.py
 | `api.py` | 위 주소들을 처리, 경로 조작 방지, 요청 출처 확인 |
 | `validation.py` | 저장 요청 검증 (형식, 범위, 알 수 없는 작물) |
 | `storage/` | SQLite 저장·백업·복구 → [storage/README.md](storage/README.md) |
-| `integrity/` | 해시 검증 → [integrity/README.md](integrity/README.md) |
+| `integrity/` | 해시 검증, 변조된 곳 찾기 → [integrity/README.md](integrity/README.md) |
+| `lab/` | 연구소 세이브와 송장 → [lab/README.md](lab/README.md) |
 
 ## 더 읽기
 - [docs/learn/01-directory-and-code-roles.md](../docs/learn/01-directory-and-code-roles.md)

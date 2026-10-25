@@ -79,6 +79,14 @@ export const EFFECTS = {
     { note: "E6", at: 0.32, len: 0.1, wave: "triangle", volume: 0.18 },
     { note: "C7", at: 0.42, len: 0.4, wave: "triangle", volume: 0.18 },
   ],
+  // 메뚜기 떼: 붕붕붕 낮게 떨리는 소리
+  locust: [0, 0.12, 0.24, 0.36, 0.48, 0.6, 0.72, 0.84].map((at, i) => ({ note: i % 2 ? "D3" : "E3", at, len: 0.14, wave: "square", volume: 0.06 })),
+  // 연구소: 바이오 연료가 꿀렁꿀렁
+  fuel: [
+    { note: "C4", at: 0, len: 0.1, slideTo: "G4", wave: "triangle", volume: 0.2 },
+    { note: "E4", at: 0.12, len: 0.1, slideTo: "C5", wave: "triangle", volume: 0.2 },
+    { note: "G5", at: 0.26, len: 0.25, wave: "triangle", volume: 0.18 },
+  ],
   // 저장: 딩-동
   save: [
     { note: "G5", at: 0, len: 0.14, wave: "triangle", volume: 0.25 },

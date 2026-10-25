@@ -33,8 +33,19 @@ def canonical(state: dict) -> bytes:
         "plots": state["plots"],
         "inventory": state["inventory"],
     }
+    if "transfers" in state:  # 연구소 송장 (세이브 버전 4부터)
+        signed["transfers"] = state["transfers"]
     return json.dumps(signed, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
 def digest(state: dict, key: bytes) -> str:
-    return hmac.new(key, canonical(state), hashlib.sha256).hexdigest()
+    return hmac_hex(canonical(state), key)
+
+
+def hmac_hex(data: bytes, key: bytes) -> str:
+    return hmac.new(key, data, hashlib.sha256).hexdigest()
+
+
+def sha256_hex(data: bytes) -> str:
+    """키 없는 그냥 해시 (연구소 실험대에서 HMAC 과 비교해 보여 줘요)"""
+    return hashlib.sha256(data).hexdigest()

@@ -1,4 +1,4 @@
-// 위쪽 상태 줄과 오른쪽 메뉴(탭: 밭 · 창고 · 부엌 · 공방 · 설정)를 그립니다.
+// 위쪽 상태 줄과 오른쪽 메뉴(탭: 밭 · 창고 · 부엌 · 공방 · 연구소 · 설정)를 그립니다.
 // 버튼을 누르면 actions 의 함수를 부를 뿐, 규칙 계산은 하지 않습니다.
 import { lightAt, partOfDay } from "../decor/daylight.js";
 import { cropColor } from "../decor/palette.js";
@@ -12,12 +12,14 @@ import { itemCount } from "../state.js";
 import { josa, PLOT_NAMES, STAGE_NAMES } from "../text.js";
 import { TIME_SCALES } from "../time/clock.js";
 import { el } from "./dom.js";
+import { labTab } from "./lab-panel.js";
 
 export const TABS = [
   { id: "plot", icon: "🌱", label: "밭", key: "P" },
   { id: "storage", icon: "📦", label: "창고", key: "I" },
   { id: "kitchen", icon: "🍳", label: "부엌", key: "K" },
   { id: "workshop", icon: "💐", label: "공방", key: "G" },
+  { id: "lab", icon: "🧪", label: "연구소", key: "L" },
   { id: "settings", icon: "⚙️", label: "설정", key: "O" },
 ];
 
@@ -43,7 +45,7 @@ function weatherIcon(weather, gameMinutes) {
 }
 
 export function renderPanel(root, game, data, actions) {
-  const content = { plot: plotTab, storage: storageTab, kitchen: kitchenTab, workshop: workshopTab, settings: settingsTab }[game.tab] ?? plotTab;
+  const content = { plot: plotTab, storage: storageTab, kitchen: kitchenTab, workshop: workshopTab, lab: labTab, settings: settingsTab }[game.tab] ?? plotTab;
   root.replaceChildren(
     el(
       "nav",
@@ -51,8 +53,9 @@ export function renderPanel(root, game, data, actions) {
       TABS.map((tab) =>
         el(
           "button",
-          { role: "tab", class: tab.id === game.tab ? "tab active" : "tab", "aria-selected": String(tab.id === game.tab), onclick: () => actions.setTab(tab.id) },
-          `${tab.icon} ${tab.label} `,
+          { role: "tab", class: tab.id === game.tab ? "tab active" : "tab", "aria-selected": String(tab.id === game.tab), title: `${tab.label} (${tab.key})`, onclick: () => actions.setTab(tab.id) },
+          el("span", { class: "tab-icon" }, tab.icon),
+          el("span", { class: "tab-label" }, tab.label),
           kbd(tab.key),
         ),
       ),
@@ -226,6 +229,7 @@ function storageTab(game, data) {
     section("🌱 씨앗", seeds, "씨앗이 없어요. 수확하면 씨앗도 얻어요."),
     section("🍲 요리", dishes, "요리가 없어요. 부엌에서 만들어 보세요."),
     section("💐 공방 물건", crafted, "꽃으로 만든 물건이 없어요. 공방에서 만들어 보세요."),
+    itemCount(state, "biofuel") > 0 && section("⛽ 바이오 연료", [tile(data.icons.fuel(), "바이오 연료", itemCount(state, "biofuel"))], ""),
   ];
 }
 

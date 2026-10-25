@@ -18,6 +18,9 @@ if sys.version_info < (3, 10):
     sys.exit("Python 3.10 이상이 필요해요. 지금 버전: " + sys.version.split()[0])
 
 from api import make_server  # noqa: E402
+from lab import transfer  # noqa: E402
+from lab.store import LabStore  # noqa: E402
+from validation import load_rules  # noqa: E402
 from storage.store import FarmStore  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -36,12 +39,16 @@ def main() -> None:
         print("세이브 파일이 깨져 있어 복구했어요:", store.recovery["restoredFrom"] or "백업이 없어 새 농장으로 시작")
     if store.integrity != "ok":
         print("⚠ 무결성 이상: 세이브 파일이 게임 밖에서 바뀐 것 같아요. 저장이 잠깁니다.")
+    lab = LabStore(ROOT / "saves")
+    resumed = transfer.recover(store, lab, load_rules(ROOT)["species"], int(time.time() * 1000))
+    if resumed:
+        print(f"중간에 끊겼던 연구소 송장 {resumed}개를 마저 처리했어요.")
 
     try:
-        server = make_server(store, ROOT, args.port)
+        server = make_server(store, ROOT, args.port, lab)
     except OSError:
         print(f"{args.port}번 포트를 쓸 수 없어 빈 포트를 찾을게요.")
-        server = make_server(store, ROOT, 0)
+        server = make_server(store, ROOT, 0, lab)
 
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     print(f"🌱 힐링 농장이 열렸어요: {url}")

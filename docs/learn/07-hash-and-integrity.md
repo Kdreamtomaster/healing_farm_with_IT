@@ -22,9 +22,9 @@
 - 코드: `server/integrity/hashing.py` 의 `canonical`, `digest`, `load_or_create_key` / `verify.py` 의 `check` (비교는 시간 차이로 힌트를 주지 않는 `hmac.compare_digest`)
 - 데이터와 지문은 **같은 트랜잭션**으로 저장 → 정상 플레이 중에는 둘이 어긋날 수 없어요 (`store.py` 의 `save`)
 - 서명하지 않는 것: 실행할 때마다 서버가 바꾸는 `lastLaunchAt`, 그리고 작업 기록 `task_log`
-- 변조가 감지되면 지금은 화면에 **"무결성 이상"** 표시 + 저장 잠금 (`store.py` 의 `SaveLocked`)
-- 파일이 **깨진 것**(사고)과 **바뀐 것**(변조)은 구분해요. 깨지면 백업 복구(06번 문서), 바뀌면 무결성 이상
-- 🚧 7단계: 변조면 메뚜기 떼가 지나간 뒤 본 농장을 처음부터 다시 시작 (백업으로 되살리지 않음), 연구소에서 지문을 직접 만져 보기 ([PLAN.md](../PLAN.md) 7단계)
+- 변조가 감지되면: 저장 잠금 → **무엇이 바뀌었는지** 마지막 정상 스냅샷과 비교해 보여 줌(`integrity/diff.py`) → 메뚜기 떼가 지나간 뒤 본 농장을 처음부터 다시 시작 (`store.py` 의 `reset`). 백업으로 되살리지 않고, 바뀐 세이브와 스냅샷은 `saves/broken/tampered-시각/` 에 남겨 둬요
+- 파일이 **깨진 것**(사고)과 **바뀐 것**(변조)은 구분해요. 깨지면 백업 복구(06번 문서), 바뀌면 초기화
+- 연구소(`L`)의 **지문 실험대**: 저장된 지문, 다시 계산한 HMAC, 키 없는 SHA-256, "만약 개수를 바꾸면?"의 지문을 나란히 보여 줘요. 브라우저의 Web Crypto 로 계산하고, 서버와 똑같은 지문이 나오는지 테스트로 확인해요 (`web/lab/bench.js`, `tests/web/lab.test.js`)
 
 ## 위협 모델: 무엇을 알아채고, 무엇은 못 알아채나
 | 상황 | 알아채나요? | 왜 |
@@ -56,4 +56,5 @@
    python tools/sql.py "SELECT count FROM inventory WHERE item = 'seed_tomato'"
    python -c "import sqlite3; db = sqlite3.connect('saves/farm.sqlite'); db.execute('UPDATE inventory SET count = 999 WHERE item = ?', ('seed_tomato',)); db.commit()"
    ```
-   서버를 켜면 화면 위에 "무결성 이상"이 뜨고 저장 버튼이 잠겨요. 서버를 끄고 개수를 **원래 숫자로 되돌리면?** 다시 정상이 돼요. 지문은 "고친 적이 있는지"가 아니라 "지금 내용이 서명한 내용과 같은지"를 보거든요
+   서버를 켜면 "세이브 파일이 게임 밖에서 바뀌었어요" 안내에 `inventory.seed_tomato: 4 → 999` 처럼 바뀐 곳이 나와요. **버튼을 누르기 전에** 서버를 끄고 개수를 원래 숫자로 되돌리면? 다시 정상이 돼요. 지문은 "고친 적이 있는지"가 아니라 "지금 내용이 서명한 내용과 같은지"를 보거든요. (버튼을 누르면 메뚜기 떼가 지나가고 그 복사본 농장은 처음부터 다시 시작해요)
+4. 🌱 연구소(`L`)의 지문 실험대에서 개수를 하나만 바꿔 보기 → 64글자 중 몇 글자가 달라지나요? 연구소 세이브(`saves/lab.sqlite`)는 게임 밖에서 고쳐 봐도 벌칙이 없어요 ([web/lab/README.md](../../web/lab/README.md))

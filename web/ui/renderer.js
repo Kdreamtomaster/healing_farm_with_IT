@@ -4,13 +4,13 @@
 //
 // 그리는 순서: 배경(풀·나무·헛간) → 창고(상자·자루)·꾸미기 물건·고양이 → 밭과 작물 → 사람·드론
 //   → 계절 색조 → 날씨 색조 → 하루의 빛 → 밤 불빛과 별 → 무지개 → 나비 → 계절 입자 → 비·눈 → 선택 표시
-// scene = { layout, state, speciesList, speciesById, crafts, palette, sprites, selectedId, hoverId, preview, animator, cat, time }
+// scene = { layout, state, speciesList, speciesById, crafts, palette, locust?: { front }, sprites, selectedId, hoverId, preview, animator, cat, time }
 //   time: 애니메이션용 시각(ms). 흔들리는 작물, 계절 효과가 이 값으로 움직여요.
 import { borderColor, cropColor, mixColors } from "../decor/palette.js";
 import { lightAt } from "../decor/daylight.js";
 import { seasonOf } from "../decor/season.js";
 import { farmSeed, weatherAt } from "../farm/weather.js";
-import { drawButterflies, drawCat } from "./critters.js";
+import { drawButterflies, drawCat, drawLocusts } from "./critters.js";
 import { drawLight, drawNightLights, drawPrecipitation, drawRainbow, drawWeatherTint } from "./sky.js";
 import { isThirsty, stageOf } from "../farm/crops.js";
 import { TILE } from "./layout.js";
@@ -48,7 +48,9 @@ export function drawFarm(ctx, scene) {
     drawSoil(ctx, ox, oy, plot, palette);
     // 칸마다 박자를 조금씩 어긋나게 해서 바람에 물결치듯 흔들려요
     const frame = beat + plot.x + plot.y;
-    if (plot.crop) {
+    // 메뚜기 떼가 지나간 칸은 작물이 사라져요 (변조 페널티 연출)
+    const eaten = scene.locust && layout.farm.x + ox + TILE / 2 < scene.locust.front;
+    if (plot.crop && !eaten) {
       const species = speciesById.get(plot.crop.species);
       const hex = cropColor(species, plot.crop.color).hex;
       ctx.drawImage(sprites.crop(species.id, stageOf(plot.crop), frame, hex), ox, oy);
@@ -72,6 +74,7 @@ export function drawFarm(ctx, scene) {
   if (sunnyDay && (season === "spring" || season === "summer")) drawButterflies(ctx, layout, time);
   drawParticles(ctx, season, look.particle, time);
   drawPrecipitation(ctx, weather, time);
+  if (scene.locust) drawLocusts(ctx, layout, scene.locust.front, time);
   // 마우스가 올라간 칸은 옅게, 고른 칸(키보드 커서)은 또렷하게
   const hovered = state.plots.find((p) => p.id === scene.hoverId);
   if (hovered && hovered.id !== selectedId) {

@@ -14,6 +14,10 @@ export function createIcons(sprites, speciesById) {
       const hex = cropColor(speciesById.get(speciesId), colorId).hex;
       return url(`crop:${speciesId}:${hex}`, () => sprites.crop(speciesId, "ripe", 0, hex));
     },
+    // 아무 색(#rrggbb)으로 칠한 다 자란 작물 (연구소 실험 작물)
+    cropHex(speciesId, hex) {
+      return url(`crop:${speciesId}:${hex}`, () => sprites.crop(speciesId, "ripe", 0, hex));
+    },
     // 씨앗 자루 (띠는 작물 색)
     seed(speciesId) {
       const hex = speciesById.get(speciesId).colors[0].hex;
@@ -22,6 +26,7 @@ export function createIcons(sprites, speciesById) {
     dish: (recipeId) => `/assets/dishes/${recipeId}.png`,
     craft: (craftId) => `/assets/crafts/${craftId}.png`,
     tool: (toolId) => `/assets/ui/tool_${toolId}.png`,
+    fuel: () => "/assets/ui/biofuel.png",
     drone: () => "/assets/actors/drone_1.png",
   };
 }

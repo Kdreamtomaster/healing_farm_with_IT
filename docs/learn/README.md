@@ -10,12 +10,12 @@
 | 04 | [데이터 파이프라인과 라벨링](04-data-pipeline-and-labeling.md) | `task_log` 표, `data/` 라벨 | ✔ 일부 (농장 일지·도감은 🚧 6단계) |
 | 05 | [자동화 DAG와 Airflow 개념](05-automation-dag-and-airflow.md) | `web/farm/autopilot.js` → `web/smartfarm/` | ✔ 일부 (스마트팜은 🚧 8단계) |
 | 06 | [내결함성과 데이터 복구](06-fault-tolerance-and-recovery.md) | `server/storage/` | ✔ |
-| 07 | [해시와 데이터 무결성](07-hash-and-integrity.md) | `server/integrity/` | ✔ 일부 (메뚜기 떼·연구소는 🚧 7단계) |
-| 08 | [시큐어 코딩과 샌드박스](08-secure-coding-and-sandbox.md) | `server/api.py`, `server/validation.py` | ✔ 일부 (연구소는 🚧 7단계) |
+| 07 | [해시와 데이터 무결성](07-hash-and-integrity.md) | `server/integrity/`, 연구소 지문 실험대 | ✔ |
+| 08 | [시큐어 코딩과 샌드박스](08-secure-coding-and-sandbox.md) | `server/api.py`, `server/validation.py`, `server/lab/` | ✔ |
 | 09 | [프로덕트 엔지니어링과 기획 원칙](09-product-engineering-principles.md) | `docs/PLAN.md` | ✔ |
 
 - ✔ 표시는 지금 게임과 코드로 바로 확인할 수 있는 내용이에요.
-- 🚧 표시는 아직 만들지 않은 기능이에요. 어떻게 만들지는 [docs/PLAN.md](../PLAN.md)의 6~8단계 설계에 적어 두었어요.
+- 🚧 표시는 아직 만들지 않은 기능이에요. 어떻게 만들지는 [docs/PLAN.md](../PLAN.md)의 6·8단계 설계에 적어 두었어요.
 
 ## 모든 문서의 짜임
 1. **한 줄 요약**
@@ -35,4 +35,4 @@
 | 🌿 | 터미널(명령 창)이나 브라우저 개발자 도구(`F12`)를 써요 |
 | 🌳 | 코드를 조금 고쳐 봐요 (고치기 전에 폴더를 통째로 복사해 두면 안심) |
 
-> ⚠️ `saves/farm.sqlite`는 **읽기만** 하세요. 게임 밖에서 고치면 무결성 이상으로 저장이 잠기고, 7단계부터는 메뚜기 떼가 지나간 뒤 농장이 처음부터 다시 시작돼요. 고쳐 보는 실험은 복사본에서!
+> ⚠️ `saves/farm.sqlite`는 **읽기만** 하세요. 게임 밖에서 고치면 무결성 이상으로 저장이 잠기고, 메뚜기 떼가 지나간 뒤 농장이 처음부터 다시 시작돼요. 고쳐 보는 실험은 복사본 폴더에서, 아니면 마음껏 고쳐도 되는 연구소 세이브(`saves/lab.sqlite`)에서!

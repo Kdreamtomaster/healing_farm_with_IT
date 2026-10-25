@@ -1,6 +1,6 @@
 // 게임 시작점: 데이터와 세이브를 불러와 비운 시간을 처리하고, 1초마다 농장의 시간을 흘려보냅니다.
 // 마우스·키보드 조작, 도구, 메뉴(옆에 붙이기 · 팝업 · 새 창)도 여기서 이어 줘요.
-import { loadCrafts, loadFriends, loadManifest, loadPalette, loadRecipes, loadSpecies, loadState, saveState } from "./api.js";
+import { loadCrafts, loadFriends, loadManifest, loadPalette, loadRecipes, loadSpecies, loadState, resetFarm, saveState } from "./api.js";
 import { isRestTime, lightAt } from "./decor/daylight.js";
 import { applyBorderToKind, setBorder } from "./decor/plots-style.js";
 import { seasonOf } from "./decor/season.js";
@@ -8,6 +8,7 @@ import { nextKitchenTask, nextTask } from "./farm/autopilot.js";
 import { BULK, bulkTargets, flood, water } from "./farm/care.js";
 import { advanceFarm, PLOT_FOR_TYPE } from "./farm/crops.js";
 import { giftMessage, giftNewSeeds } from "./farm/seed-gift.js";
+import { createLab } from "./lab/sandbox.js";
 import { harvest, plant } from "./farm/harvest.js";
 import { cycleColor, cycleSeed, seedFor, smartTask, toolTask } from "./farm/tools.js";
 import { farmSeed, weatherAt } from "./farm/weather.js";
@@ -26,12 +27,13 @@ import { renderHelp } from "./ui/help.js";
 import { createIcons, toolCursor } from "./ui/icons.js";
 import { commandForKey, MOVES, moveCursor } from "./ui/keys.js";
 import { computeLayout, fitZoom, giftSpots, picnicSeats } from "./ui/layout.js";
-import { hideLoading, showProgress, showSummary } from "./ui/loading.js";
+import { hideLoading, showNotice, showProgress, showSummary } from "./ui/loading.js";
 import { plotSummary, renderHeader, renderPanel } from "./ui/panels.js";
 import { drawFarm, plotAt } from "./ui/renderer.js";
 import { loadSprites } from "./ui/sprites.js";
 import { showToast } from "./ui/toast.js";
 import { renderToolbar } from "./ui/toolbar.js";
+import { tamperLines } from "./ui/tamper.js";
 import { hideTip, showTip } from "./ui/tooltip.js";
 
 // 이만큼 넘게 시간이 비면(컴퓨터 잠자기 등) 플레이 중이 아니라 "비운 시간"으로 보고 친구들이 돌봐요.
@@ -98,7 +100,13 @@ const game = {
   // 메뉴: dock(옆에 붙이기) · float(농장 위 팝업) · window(새 창)
   menu: { mode: "dock", floatOpen: false, folded: Boolean(prefs.folded) },
   ui: {}, // 접어 둔 목록을 펼쳤는지 같은 작은 화면 상태
+  lab: null, // 연구소 상태 (연구소 탭을 열면 서버에서 읽어요)
+  labBench: null, // 지문 실험대의 "만약에" 계산 결과
+  locust: null, // 메뚜기 떼 연출 중이면 { front }
 };
+
+// 연구소: 서버의 연구소와 이야기하고 지문 실험대를 계산해요 (save·draw·record 는 아래에 있는 함수예요)
+const lab = createLab({ game, speciesById, save, draw, showToast, playSound, record });
 
 // 농장 상태가 몇 시(현실 시각, ms)까지 계산되어 있는지
 let lastTick = boot.serverNow;
@@ -322,8 +330,17 @@ const actions = {
     draw();
   },
   // 접었다 편 메뉴처럼, 다시 그려도 그대로 두고 싶은 화면 상태
-  remember(key, value) {
+  remember(key, value, redraw = false) {
     game.ui[key] = value;
+    if (redraw) draw();
+  },
+  // 연구소 (web/lab/sandbox.js)
+  labSend: (speciesId, count) => lab.send(speciesId, count),
+  labFuel: (sampleId) => lab.fuel(sampleId),
+  labExperiment: (sampleId, color, size) => lab.experiment(sampleId, color, size),
+  labWhatIf: (sampleId, count) => lab.whatIf(sampleId, count),
+  labClear() {
+    if (confirm("연구소를 비울까요? 실험 작물은 모두 사라져요.")) lab.clear();
   },
   preview(speciesId, colorId) {
     game.preview = speciesId ? { plotId: game.selectedId, speciesId, colorId } : null;
@@ -457,6 +474,7 @@ const actions = {
     game.tab = tab;
     savePrefs();
     draw();
+    if (tab === "lab") lab.refresh(); // 연구소는 열 때마다 서버에서 새로 읽어요 (게임 밖에서 고쳤을 수도 있으니까요)
   },
   openTab(tab) {
     if (game.menu.mode === "float") game.menu.floatOpen = !(game.menu.floatOpen && game.tab === tab);
@@ -475,12 +493,15 @@ const actions = {
   toggleHelp,
 };
 
+// 저장했으면 true
 async function save({ silent = false, keepalive = false } = {}) {
-  if (game.integrity !== "ok") return;
+  if (game.integrity !== "ok") return false;
   // 보내는 기록은 목록에서 꺼내 두고, 실패하면 되돌려 놓아요. (두 번 저장되는 일을 막기 위해)
   const sending = game.log.splice(0, MAX_LOG_PER_SAVE);
+  let saved = false;
   try {
     const result = await saveState(game.state, sending, keepalive);
+    saved = result.ok;
     if (result.ok) {
       game.state.meta.lastSavedAt = result.lastSavedAt;
       if (!silent) {
@@ -496,6 +517,7 @@ async function save({ silent = false, keepalive = false } = {}) {
     if (!keepalive) showToast("서버와 연결할 수 없어요. 서버 창이 켜져 있는지 확인해 주세요.");
   }
   draw();
+  return saved;
 }
 
 const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
@@ -603,6 +625,7 @@ function draw() {
     game.state.inventory,
     game.state.meta.timeScale,
     game.seedChoice,
+    game.tab === "lab" && [game.lab, game.labBench, game.ui],
   ]);
   if (root && key !== panelKey) {
     panelKey = key;
@@ -629,7 +652,7 @@ function animate(time) {
   if (time - lastFrame >= FRAME_MS) {
     lastFrame = time;
     animator.update(time);
-    drawFarm(ctx, { ...data, layout, sprites, animator, cat, state: game.state, selectedId: game.selectedId, hoverId: game.hoverId, preview: game.preview, time });
+    drawFarm(ctx, { ...data, layout, sprites, animator, cat, state: game.state, selectedId: game.selectedId, hoverId: game.hoverId, preview: game.preview, locust: game.locust, time });
   }
   requestAnimationFrame(animate);
 }
@@ -802,6 +825,7 @@ window.addEventListener("keydown", unlockAudio);
 draw(); // 도구 막대를 먼저 그려야 화면 크기를 맞출 수 있어요
 setIdleMode(idleMode); // 버튼 글자와 화면 크기 맞추기 (fitScreen 포함)
 setTool("look");
+if (game.tab === "lab") lab.refresh();
 requestAnimationFrame(animate);
 if (boot.recovery) {
   showToast(
@@ -810,14 +834,52 @@ if (boot.recovery) {
       : "세이브 파일이 깨졌고 백업이 없어 새 농장으로 시작해요",
   );
 }
+// ── 무결성 이상(변조): 무엇이 바뀌었는지 보여 주고 → 메뚜기 떼 → 완전 초기화 ──
+// 지문이 맞지 않는 세이브는 서버가 저장을 잠가요. 약속(docs/PLAN.md 의 확정된 기획 결정)대로 처음부터 다시 시작해요.
+const LOCUST_MS = 4000;
+async function tamperFlow() {
+  await showNotice("세이브 파일이 게임 밖에서 바뀌었어요", tamperLines(boot.tamperDiff), "메뚜기 떼 맞이하기");
+  const from = layout.farm.x - 8;
+  const to = layout.width + 60; // 떼의 꼬리까지 화면 밖으로
+  game.locust = { front: from };
+  const buzz = setInterval(() => playSound("locust"), 950);
+  playSound("locust");
+  await new Promise((resolve) => {
+    const start = performance.now();
+    const step = (now) => {
+      const k = Math.min(1, (now - start) / LOCUST_MS);
+      game.locust.front = from + (to - from) * k;
+      if (k < 1) requestAnimationFrame(step);
+      else resolve();
+    };
+    requestAnimationFrame(step);
+  });
+  clearInterval(buzz);
+  const result = await resetFarm();
+  if (!result.ok) {
+    game.locust = null;
+    return showToast(`처음부터 다시 시작하지 못했어요: ${result.error ?? result.status}`);
+  }
+  location.replace("/?fresh=1"); // 새 농장으로 다시 열기
+}
+
 // 게임에 새 작물이 늘었으면 씨앗을 한 번 선물해요 (아래 catchUp 이 끝나면 함께 저장돼요)
 const gifts = giftNewSeeds(game.state, speciesList);
 if (gifts.length) record("gift", gifts.map((s) => s.id).join(","), "system");
-busy = true;
-showProgress("농장으로 가는 중…", 0);
-await catchUp(game.state.meta.lastSavedAt, boot.serverNow); // 마지막 저장부터 지금까지 (끝나면 저장)
-busy = false;
-if (gifts.length) showToast(giftMessage(gifts));
-startAutosave(save);
+if (game.integrity === "tampered") {
+  hideLoading();
+  await tamperFlow(); // 초기화되면 페이지를 새로 열어요
+} else {
+  busy = true;
+  showProgress("농장으로 가는 중…", 0);
+  await catchUp(game.state.meta.lastSavedAt, boot.serverNow); // 마지막 저장부터 지금까지 (끝나면 저장)
+  busy = false;
+  if (gifts.length) showToast(giftMessage(gifts));
+  if (new URLSearchParams(location.search).has("fresh")) {
+    showToast("메뚜기 떼가 지나갔어요. 새 농장에서 다시 시작해요 🌱");
+    history.replaceState(null, "", "/");
+  }
+  startAutosave(save);
+}
 setInterval(tick, 1000);
 setInterval(idleStep, IDLE_STEP_MS);

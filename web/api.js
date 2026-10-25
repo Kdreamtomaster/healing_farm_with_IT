@@ -46,3 +46,25 @@ export async function saveState(state, log, keepalive = false) {
   const body = await res.json().catch(() => ({}));
   return { ok: res.ok, status: res.status, ...body };
 }
+
+// 저장이 아닌 요청들 (완전 초기화, 연구소). 결과: { ok, status, ...답장 }
+async function post(url, body = {}) {
+  try {
+    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    return { ok: res.ok, status: res.status, ...(await res.json().catch(() => ({}))) };
+  } catch {
+    return { ok: false, status: 0, error: "서버와 연결할 수 없어요" };
+  }
+}
+
+// 변조가 확인된 농장을 처음부터 다시 시작 (서버는 변조일 때만 받아요)
+export const resetFarm = () => post("/api/reset");
+
+// ── 연구소 ──
+export function loadLab() {
+  return getJson("/api/lab/state", "연구소");
+}
+export const labImport = (species, count) => post("/api/lab/import", { species, count });
+export const labFuel = (sampleId, count) => post("/api/lab/fuel", { sampleId, count });
+export const labExperiment = (sampleId, color, size) => post("/api/lab/experiment", { sampleId, color, size });
+export const labClear = () => post("/api/lab/clear");

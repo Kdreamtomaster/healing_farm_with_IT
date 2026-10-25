@@ -4,8 +4,14 @@
 |-------------------|-----------------------------------------------|
 | GET  /            | 게임 첫 화면(web/index.html)                   |
 | GET  /web/... 등  | web, assets, data, tests 폴더 안의 파일        |
-| GET  /api/state   | 저장된 농장 상태 + 무결성 결과 + 복구 안내      |
+| GET  /api/state   | 저장된 농장 상태 + 무결성 결과 + 복구 안내 (변조면 바뀐 곳도) |
 | POST /api/save    | 농장 상태 저장                                 |
+| POST /api/reset   | 완전 초기화 (변조가 확인된 때만)                |
+| GET  /api/lab/state       | 연구소 상태 + 지문 실험대 재료              |
+| POST /api/lab/import      | 농장 작물 → 연구소 (한 방향)               |
+| POST /api/lab/fuel        | 실험 작물 → 바이오 연료 → 농장              |
+| POST /api/lab/experiment  | 실험 작물의 색·크기 바꾸기                  |
+| POST /api/lab/clear       | 지문이 맞지 않는 연구소 비우기              |
 """
 
 import json
@@ -16,7 +22,10 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 import validation
-from storage.store import FarmStore, LayoutMismatch, SaveLocked
+from integrity import verify
+from lab import transfer
+from lab.store import LabLocked, LabStore
+from storage.store import FarmStore, LayoutMismatch, NotTampered, SaveLocked
 
 # 브라우저가 읽어 갈 수 있는 폴더. saves/ 나 server/ 는 일부러 뺐습니다 (최소 권한).
 STATIC_DIRS = {"web", "assets", "data", "tests"}
@@ -47,8 +56,42 @@ def resolve_static(root: Path, url_path: str):
     return target
 
 
-def make_server(store: FarmStore, root: Path, port: int) -> ThreadingHTTPServer:
+def make_server(store: FarmStore, root: Path, port: int, lab: LabStore = None) -> ThreadingHTTPServer:
     rules = validation.load_rules(root)
+    lab = lab or LabStore(store.saves_dir)
+
+    # 저장이 아닌 POST 요청들: 주소 → (요청 body → 답장 dict)
+    def reset(body):
+        store.reset(_now())
+        return {"ok": True}
+
+    def lab_import(body):
+        species, count = validation.validate_lab_send(body, rules)
+        sent = transfer.send_to_lab(store, lab, species, count, _now())
+        return {"transfer": sent, "lab": lab.load()}
+
+    def lab_fuel(body):
+        sample_id, count = validation.validate_lab_fuel(body)
+        sent = transfer.send_fuel(store, lab, sample_id, count, _now())
+        return {"transfer": sent, "lab": lab.load()}
+
+    def lab_experiment(body):
+        lab.experiment(*validation.validate_lab_experiment(body))
+        return {"lab": lab.load()}
+
+    def lab_clear(body):
+        if lab.load()["integrity"] == verify.OK:
+            raise LabLocked("지문이 맞는 연구소는 비우지 않아요")
+        lab.clear()
+        return {"lab": lab.load()}
+
+    actions = {
+        "/api/reset": reset,
+        "/api/lab/import": lab_import,
+        "/api/lab/fuel": lab_fuel,
+        "/api/lab/experiment": lab_experiment,
+        "/api/lab/clear": lab_clear,
+    }
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -57,6 +100,8 @@ def make_server(store: FarmStore, root: Path, port: int) -> ThreadingHTTPServer:
             path = urlsplit(self.path).path
             if path == "/api/state":
                 return self._send_json(200, {**store.load(), "serverNow": _now()})
+            if path == "/api/lab/state":
+                return self._send_json(200, lab.load())
             if path == "/":
                 path = "/web/index.html"
             elif path.endswith("/"):
@@ -75,18 +120,26 @@ def make_server(store: FarmStore, root: Path, port: int) -> ThreadingHTTPServer:
         def do_POST(self):
             if not self._trusted():
                 return
-            if urlsplit(self.path).path != "/api/save":
+            path = urlsplit(self.path).path
+            if path != "/api/save" and path not in actions:
                 return self._send_json(404, {"error": "찾을 수 없어요"})
             length = int(self.headers.get("Content-Length") or 0)
             if length > MAX_BODY:
                 return self._send_json(413, {"error": "저장 요청이 너무 커요"})
             try:
-                game = validation.validate_save(json.loads(self.rfile.read(length) or b"null"), rules)
+                body = json.loads(self.rfile.read(length) or b"null")
+                if path != "/api/save":
+                    return self._send_json(200, actions[path](body))
+                game = validation.validate_save(body, rules)
                 return self._send_json(200, store.save(game, _now()))
-            except (json.JSONDecodeError, validation.ValidationError, LayoutMismatch) as error:
-                return self._send_json(400, {"error": str(error) or "잘못된 저장 요청이에요"})
+            except (json.JSONDecodeError, validation.ValidationError, LayoutMismatch, ValueError) as error:
+                return self._send_json(400, {"error": str(error) or "잘못된 요청이에요"})
             except SaveLocked:
                 return self._send_json(409, {"error": "무결성 이상이 감지되어 저장이 잠겨 있어요"})
+            except NotTampered:
+                return self._send_json(409, {"error": "농장 지문이 정상이라 초기화하지 않아요"})
+            except LabLocked as error:
+                return self._send_json(409, {"error": str(error) or "연구소 지문이 맞지 않아요. 연구소를 비우거나 고친 값을 되돌려 주세요"})
 
         def _trusted(self) -> bool:
             """내 PC 의 게임 화면에서 온 요청인지 확인합니다.

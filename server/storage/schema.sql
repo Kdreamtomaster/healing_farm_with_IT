@@ -47,3 +47,13 @@ CREATE TABLE IF NOT EXISTS integrity (
     algo   TEXT NOT NULL,
     digest TEXT NOT NULL
 );
+
+-- 연구소와 주고받은 송장 번호 (7단계). 같은 송장을 두 번 처리하지 않으려고 기억해 둡니다.
+--   kind: to_lab(농장 작물을 연구소로 보냄) / fuel(연구소에서 바이오 연료를 받음)
+CREATE TABLE IF NOT EXISTS transfers (
+    id     TEXT    PRIMARY KEY,
+    kind   TEXT    NOT NULL,
+    item   TEXT    NOT NULL,
+    amount INTEGER NOT NULL,
+    at     INTEGER NOT NULL         -- 현실 시각(ms)
+);

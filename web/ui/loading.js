@@ -12,8 +12,14 @@ export function showProgress(title, ratio) {
 
 // 안내 문장을 보여 주고, "농장으로" 버튼을 누르면 끝나는 Promise 를 돌려줍니다.
 export function showSummary(lines) {
+  return showNotice("다녀오셨어요!", lines, "농장으로");
+}
+
+// 제목·문장·버튼 글자를 정해 안내 화면을 띄워요. 버튼을 누르면 끝나는 Promise
+export function showNotice(title, lines, buttonText) {
   $("loading").hidden = false;
-  $("loading-title").textContent = "다녀오셨어요!";
+  $("loading-close").textContent = buttonText;
+  $("loading-title").textContent = title;
   $("loading-progress").hidden = true;
   $("loading-lines").replaceChildren(
     ...lines.map((line) => {

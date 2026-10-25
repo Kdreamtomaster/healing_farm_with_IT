@@ -9,7 +9,7 @@ import sqlite3
 from pathlib import Path
 
 # 표 구조를 바꾸면 이 숫자를 올리고 migrations.py 에 옮기는 방법을 적어 주세요.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 SCHEMA_FILE = Path(__file__).with_name("schema.sql")
 REQUIRED_TABLES = {"meta", "plots", "crops", "inventory", "task_log", "integrity"}
 
@@ -35,7 +35,7 @@ def check_file(path: Path) -> bool:
         conn = sqlite3.connect(str(path))
         try:
             result = conn.execute("PRAGMA integrity_check").fetchone()[0]
-            tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+            tables = _tables(conn)
         finally:
             conn.close()
     except sqlite3.DatabaseError:
@@ -123,7 +123,41 @@ def read_state(conn: sqlite3.Connection) -> dict:
         crops[crop.pop("plotId")] = crop
     plots = [{**plot, "crop": crops.get(plot["id"])} for plot in _read_rows(conn, "plots", PLOT_FIELDS, "ORDER BY id")]
     inventory = dict(conn.execute("SELECT item, count FROM inventory ORDER BY item"))
-    return {"meta": meta, "plots": plots, "inventory": inventory}
+    state = {"meta": meta, "plots": plots, "inventory": inventory}
+    if "transfers" in _tables(conn):  # 버전 4부터 (그 전 세이브의 지문을 확인할 수 있도록 없으면 빼요)
+        state["transfers"] = _read_rows(conn, "transfers", TRANSFER_FIELDS, "ORDER BY id")
+    return state
+
+
+TRANSFER_FIELDS = {"id": "id", "kind": "kind", "item": "item", "amount": "amount", "at": "at"}
+
+
+def _tables(conn: sqlite3.Connection) -> set:
+    return {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+
+
+def has_transfer(conn: sqlite3.Connection, transfer_id: str) -> bool:
+    return conn.execute("SELECT 1 FROM transfers WHERE id = ?", (transfer_id,)).fetchone() is not None
+
+
+def add_transfer(conn: sqlite3.Connection, transfer: dict) -> None:
+    conn.execute(
+        "INSERT INTO transfers (id, kind, item, amount, at) VALUES (?, ?, ?, ?, ?)",
+        (transfer["id"], transfer["kind"], transfer["item"], transfer["amount"], transfer["at"]),
+    )
+
+
+def change_item(conn: sqlite3.Connection, item: str, delta: int) -> int:
+    """창고 물건 개수를 delta 만큼 바꾸고 바뀐 개수를 돌려줍니다. 0 이 되면 줄을 지워요."""
+    row = conn.execute("SELECT count FROM inventory WHERE item = ?", (item,)).fetchone()
+    count = (row[0] if row else 0) + delta
+    if count < 0:
+        raise ValueError(f"{item} 이(가) 모자라요")
+    if count == 0:
+        conn.execute("DELETE FROM inventory WHERE item = ?", (item,))
+    else:
+        conn.execute("INSERT INTO inventory (item, count) VALUES (?, ?) ON CONFLICT(item) DO UPDATE SET count = excluded.count", (item, count))
+    return count
 
 
 def read_layout(conn: sqlite3.Connection) -> list:

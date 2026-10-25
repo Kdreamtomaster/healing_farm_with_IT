@@ -47,6 +47,30 @@ export function drawButterflies(ctx, layout, time) {
   });
 }
 
+// 메뚜기 떼 (변조가 확인되면 한 번 지나가요): front 는 떼의 맨 앞 x 좌표.
+// 메뚜기마다 떼 안의 자리가 정해져 있고, 위아래로 통통 튀며 날아요. 무섭지 않게 작고 동글동글하게.
+const LOCUSTS = 48;
+export function locustPositions(layout, front, time) {
+  const { farm } = layout;
+  return Array.from({ length: LOCUSTS }, (_, i) => {
+    const behind = (i * 37) % 56; // 떼의 길이 56px
+    const row = ((i * 53) % 100) / 100;
+    const hop = Math.abs(Math.sin(time / 120 + i)) * 3;
+    return { x: Math.round(front - behind), y: Math.round(farm.y - 6 + row * (farm.h + 12) - hop), open: Math.floor(time / 90 + i) % 2 === 0 };
+  });
+}
+
+export function drawLocusts(ctx, layout, front, time) {
+  for (const { x, y, open } of locustPositions(layout, front, time)) {
+    ctx.fillStyle = "#7a9a3a";
+    ctx.fillRect(x, y, 4, 2); // 몸통
+    ctx.fillStyle = "#4a3b2a";
+    ctx.fillRect(x + 4, y, 1, 1); // 눈
+    ctx.fillStyle = "rgba(230, 240, 200, 0.85)";
+    ctx.fillRect(x + 1, open ? y - 2 : y - 1, 2, open ? 2 : 1); // 날개 팔랑
+  }
+}
+
 // 말풍선 없이 쓰는 작은 그림 기호 (하트, 음표, 별, 쿨쿨)
 const ICONS = {
   heart: { color: "#f06a8a", rows: [".X.X.", "XXXXX", "XXXXX", ".XXX.", "..X.."] },

@@ -4,8 +4,8 @@
     1. 파일이 깨졌으면(파일 손상) → 최근 정상 스냅샷으로 복구
     2. 파일이 없으면 → 새 농장 만들기
     3. 옛 버전 세이브면 → 새 표 구조로 옮기기 (마이그레이션)
-    4. 지문(해시) 검증 → 맞지 않으면(변조) 저장을 잠금
-       (메뚜기 떼와 완전 초기화는 7단계에서 구현합니다)
+    4. 지문(해시) 검증 → 맞지 않으면(변조) 저장을 잠그고, 마지막 정상 스냅샷과 무엇이 다른지 찾아 둠
+       → 화면이 메뚜기 떼 연출을 보여 준 뒤 reset() 으로 완전 초기화
 """
 
 import json
@@ -14,7 +14,7 @@ import threading
 from contextlib import closing
 from pathlib import Path
 
-from integrity import hashing, verify
+from integrity import diff, hashing, verify
 from storage import backup, db, migrations
 
 
@@ -26,6 +26,10 @@ class LayoutMismatch(ValueError):
     """저장 요청의 구획 배치가 세이브와 다를 때 발생합니다."""
 
 
+class NotTampered(Exception):
+    """변조가 아닌데 완전 초기화를 요청했을 때 발생합니다."""
+
+
 class FarmStore:
     def __init__(self, saves_dir: Path, data_dir: Path):
         self.saves_dir = saves_dir
@@ -35,6 +39,7 @@ class FarmStore:
         self.broken_dir = saves_dir / "broken"
         self.integrity = None
         self.recovery = None
+        self.tamper_diff = None  # 변조였다면: 마지막 정상 스냅샷과 달라진 곳
         self._key = b""
         # 서버는 여러 요청을 동시에 받을 수 있으므로, 세이브 파일은 한 번에 한 요청만 만집니다.
         self._lock = threading.Lock()
@@ -54,11 +59,71 @@ class FarmStore:
                 state = db.read_state(conn)
                 stored = db.read_digest(conn)
             self.integrity = verify.check(state, stored, self._key)
+            if self.integrity == verify.TAMPERED:
+                self.tamper_diff = self._diff_with_backup(state)
 
     def load(self) -> dict:
         with self._lock, closing(db.connect(self.db_path)) as conn:
             state = db.read_state(conn)
-        return {"state": state, "integrity": self.integrity, "recovery": self.recovery}
+        loaded = {"state": state, "integrity": self.integrity, "recovery": self.recovery}
+        if self.integrity == verify.TAMPERED:
+            loaded["tamperDiff"] = self.tamper_diff
+        return loaded
+
+    def reset(self, now: int) -> None:
+        """완전 초기화: 변조된 세이브와 스냅샷을 broken/tampered-시각/ 으로 옮기고 새 농장을 만듭니다.
+
+        변조가 확인된 때만 할 수 있어요. 정상 농장을 실수로 지우는 일이 없도록요.
+        """
+        with self._lock:
+            if self.integrity != verify.TAMPERED:
+                raise NotTampered()
+            dest = self.broken_dir / f"tampered-{backup._stamp(now)}"
+            backup.quarantine_tampered(self.db_path, self.backups_dir, dest)
+            self._new_farm(now)
+            with closing(db.connect(self.db_path)) as conn:
+                db.append_log(conn, [{"at": 0, "actor": "system", "action": "reset", "detail": "지문 불일치(변조) → 완전 초기화"}])
+            self.integrity = verify.OK
+            self.tamper_diff = None
+            self.recovery = None
+
+    def apply_transfer(self, transfer: dict, now: int) -> bool:
+        """연구소 송장 하나를 농장 창고에 반영합니다. 이미 받은 송장이면 아무것도 안 하고 False (멱등).
+
+        transfer: { id, kind: "to_lab"(작물을 연구소로 보냄 → 창고에서 빼기) | "fuel"(연료를 받음 → 더하기), item, amount, at }
+        창고가 모자라면 ValueError. 창고·송장·지문을 한 트랜잭션으로 씁니다.
+        """
+        delta = transfer["amount"] if transfer["kind"] == "fuel" else -transfer["amount"]
+        with self._lock:
+            if self.integrity != verify.OK:
+                raise SaveLocked()
+            with closing(db.connect(self.db_path)) as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                try:
+                    if db.has_transfer(conn, transfer["id"]):
+                        conn.execute("ROLLBACK")
+                        return False
+                    db.change_item(conn, transfer["item"], delta)
+                    db.add_transfer(conn, transfer)
+                    db.write_digest(conn, hashing.ALGO, hashing.digest(db.read_state(conn), self._key))
+                    conn.execute("COMMIT")
+                except BaseException:
+                    conn.execute("ROLLBACK")
+                    raise
+                backup.snapshot(conn, self.backups_dir, now)
+        return True
+
+    def transfers(self) -> list:
+        with self._lock, closing(db.connect(self.db_path)) as conn:
+            return db.read_state(conn).get("transfers", [])
+
+    def _diff_with_backup(self, state: dict):
+        """지문까지 맞는 가장 최근 스냅샷과 비교한 차이. 그런 스냅샷이 없으면 None."""
+        for candidate in backup.list_backups(self.backups_dir):
+            if self._is_valid_backup(candidate):
+                with closing(db.connect(candidate)) as conn:
+                    return diff.changes(db.read_state(conn), state)
+        return None
 
     def save(self, game: dict, now: int) -> dict:
         """검증을 마친 저장 요청을 기록합니다. 데이터와 지문은 같은 트랜잭션으로 함께 저장됩니다."""

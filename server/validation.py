@@ -23,12 +23,14 @@ def load_rules(root: Path) -> dict:
 
     colors:  작물 id → 고를 수 있는 색 id 들 (data/crops.json)
     borders: 고를 수 있는 테두리 색 id 들 (assets/palette.json)
+    species: 작물 id → data/crops.json 의 항목 (연구소로 보낼 때 씀)
     """
     crops = json.loads((root / "data" / "crops.json").read_text(encoding="utf-8"))["crops"]
     palette = json.loads((root / "assets" / "palette.json").read_text(encoding="utf-8"))
     return {
         "colors": {c["id"]: {color["id"] for color in c["colors"]} for c in crops},
         "borders": {b["id"] for b in palette["borders"]},
+        "species": {c["id"]: c for c in crops},
     }
 
 
@@ -87,6 +89,37 @@ def validate_save(payload, rules: dict) -> dict:
         "inventory": inventory,
         "log": log,
     }
+
+
+HEX_COLOR = re.compile(r"^#[0-9a-f]{6}$")
+LAB_SIZES = {"small", "normal", "big"}
+MAX_TRANSFER = 10000
+
+
+def validate_lab_send(payload, rules: dict) -> tuple:
+    """연구소로 보내기 요청 { species, count } → (crops.json 항목, 개수)"""
+    body = _dict(payload, "요청")
+    species = rules["species"].get(body.get("species")) if isinstance(body.get("species"), str) else None
+    if species is None:
+        raise ValidationError("species 는 data/crops.json 에 있는 작물이어야 해요")
+    return species, _int(body.get("count"), "count", 1, MAX_TRANSFER)
+
+
+def validate_lab_fuel(payload) -> tuple:
+    """연료 보내기 요청 { sampleId, count } → (실험 작물 번호, 개수)"""
+    body = _dict(payload, "요청")
+    return _int(body.get("sampleId"), "sampleId", 1, 10**9), _int(body.get("count"), "count", 1, MAX_TRANSFER)
+
+
+def validate_lab_experiment(payload) -> tuple:
+    """실험 요청 { sampleId, color: "#rrggbb", size } → (번호, 색, 크기)"""
+    body = _dict(payload, "요청")
+    color, size = body.get("color"), body.get("size")
+    if not isinstance(color, str) or not HEX_COLOR.match(color):
+        raise ValidationError("color 는 #rrggbb 모양의 색이어야 해요")
+    if size not in LAB_SIZES:
+        raise ValidationError("size 는 small / normal / big 중 하나예요")
+    return _int(body.get("sampleId"), "sampleId", 1, 10**9), color, size
 
 
 def _crop(raw, colors: dict, where: str) -> dict:
