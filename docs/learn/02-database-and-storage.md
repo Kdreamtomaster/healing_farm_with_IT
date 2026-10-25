@@ -22,5 +22,5 @@
 
 ## 직접 해 보기
 1. 게임을 실행해 `saves/farm.sqlite`가 생긴 것 확인하기
-2. 무료 도구 *DB Browser for SQLite*로 파일을 열어 표 구경하기 (읽기만! 고치면 메뚜기가 와요)
+2. 무료 도구 *DB Browser for SQLite*로 파일을 열어 표 구경하기 (읽기만! 고치면 메뚜기 떼가 와서 농장이 초기화돼요)
 3. `SELECT COUNT(*) FROM crops;` 로 심은 작물 수 세어 보기
