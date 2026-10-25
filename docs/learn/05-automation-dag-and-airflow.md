@@ -26,20 +26,22 @@
 
 **작업의 상태** — 요리는 두 단계예요 (`web/friends/cooking.js` 의 `startCooking` → `finishCooking`). 시작할 때 재료를 먼저 꺼내 두어서, 끓는 동안 같은 재료로 다른 요리를 또 시작하지 않아요. "대기 → 실행 중 → 완료"라는 **작업 상태**를 나눈 것이죠.
 
-🚧 **8단계 스마트팜** ([PLAN.md](../PLAN.md) 8단계, [web/smartfarm/](../../web/smartfarm/README.md))
+**스마트팜** (자동화 탭 `B`, [web/smartfarm/](../../web/smartfarm/README.md))
 ```
 씨앗 심기 → 수분 확인 → 물주기 → 다 자람 기다리기 → 수확 → 꽃다발 만들기
                           └ 촉촉하면 "건너뜀" (기다리기는 실패만 없으면 시작)
 ```
-- 블록을 이어 나만의 DAG 만들기, 화살표가 빙글 돌면 연결 거부(어디서 도는지 보여 줌)
-- 블록마다 색으로 상태 표시: 대기 / 실행 중 / 성공 / 건너뜀 / 다시 시도 대기 / 실패
+- 블록을 이어 나만의 DAG 만들기, 화살표가 빙글 돌면 연결 거부(어디서 도는지 보여 줌) → `web/smartfarm/dag.js` 의 `topoOrder`(Kahn 알고리즘), `findCycle`
+- 서버도 저장할 때 Python `graphlib` 으로 한 번 더 검사해요 (`server/validation.py` 의 `_smartfarm`) — 아래 실험 2·3 과 같은 도구
+- 블록마다 색으로 상태 표시: 대기 / 기다리는 중(센서) / 성공 / 건너뜀 / 다시 시도 대기 / 실패 / 앞 단계 실패 → `web/smartfarm/runner.js` 의 `stepRun`
+- 실행 기록 격자(Airflow 의 Grid 보기)로 최근 8번의 실행을 한눈에
 - 바이오 연료가 없으면 실패 → 정해진 횟수만큼 재시도. 실패해도 작물에게 나쁜 일은 없어요. 멈춘 자리만 알려 줘요
 - **"Airflow 코드로 보기"**: 내가 만든 DAG 를 진짜 Airflow 파이썬 코드 모양으로 보여 주기
 
 ## 실제 제품에서는: Apache Airflow
 Airflow는 회사에서 "매일 새벽 3시에 어제 매출을 모아 → 정리하고 → 보고서 만들기" 같은 데이터 작업을 DAG로 자동 실행하는 도구예요.
 
-| 게임 (8단계) | Airflow |
+| 게임 | Airflow |
 |---|---|
 | 작업 블록 | Task (Operator) |
 | 블록 연결 | `심기 >> 물주기` |
@@ -55,10 +57,12 @@ plant >> check_moisture >> water >> wait_ripe >> harvest >> make_bouquet
 ```
 
 ## 직접 해 보기
-1. 🌱 멍때리기 모드(`M`)를 켜고 농부들이 "수확 → 물주기 → 심기" 우선순위대로 움직이는지 지켜보기
+1. 🌱 멍때리기 모드(`M`)를 켜고 농부들이 "수확 → 물주기 → 심기" 우선순위대로 움직이는지 지켜보기. 그다음 자동화(`B`)에서 "꽃다발 공장"을 실행해, 순서가 정해진 흐름과 비교하기
 2. 🌿 위상 정렬을 파이썬으로 (Python 3.9 이상에 들어 있는 `graphlib`)
    ```bash
    python -c "from graphlib import TopologicalSorter as T; print(list(T({'water': {'plant'}, 'wait_ripe': {'water'}, 'harvest': {'wait_ripe'}, 'bouquet': {'harvest'}}).static_order()))"
    ```
    `{'water': {'plant'}}` 은 "water 는 plant 다음에"라는 뜻이에요. 순서가 어떻게 나오나요?
 3. 🌿 빙글 도는 길 만들기: 위 사전에 `'plant': {'bouquet'}` 을 더하면? → `CycleError` 와 함께 어디서 도는지 알려 줘요. 이게 바로 DAG 의 *Acyclic* 검사예요
+4. 🌱 자동화 탭의 "블록 고치기"에서 bouquet → plant 화살표를 이어 보기 → 게임도 같은 길을 알려 주며 거부해요
+5. 🌱 바이오 연료가 0개일 때 ▶ 지금 실행 → 실패 / 다시 시도 대기 / 앞 단계 실패 색을 보고, "Airflow 코드로 보기"에서 `retries`, `trigger_rule` 이 어떻게 적히는지 찾아보기

@@ -1,4 +1,4 @@
-// 위쪽 상태 줄과 오른쪽 메뉴(탭: 밭 · 창고 · 부엌 · 공방 · 연구소 · 설정)를 그립니다.
+// 위쪽 상태 줄과 오른쪽 메뉴(탭: 밭 · 창고 · 부엌 · 공방 · 연구소 · 자동화 · 설정)를 그립니다.
 // 버튼을 누르면 actions 의 함수를 부를 뿐, 규칙 계산은 하지 않습니다.
 import { lightAt, partOfDay } from "../decor/daylight.js";
 import { cropColor } from "../decor/palette.js";
@@ -13,6 +13,7 @@ import { josa, PLOT_NAMES, STAGE_NAMES } from "../text.js";
 import { TIME_SCALES } from "../time/clock.js";
 import { el } from "./dom.js";
 import { labTab } from "./lab-panel.js";
+import { smartfarmTab } from "./smartfarm-panel.js";
 
 export const TABS = [
   { id: "plot", icon: "🌱", label: "밭", key: "P" },
@@ -20,6 +21,7 @@ export const TABS = [
   { id: "kitchen", icon: "🍳", label: "부엌", key: "K" },
   { id: "workshop", icon: "💐", label: "공방", key: "G" },
   { id: "lab", icon: "🧪", label: "연구소", key: "L" },
+  { id: "smartfarm", icon: "🤖", label: "자동화", key: "B" },
   { id: "settings", icon: "⚙️", label: "설정", key: "O" },
 ];
 
@@ -45,7 +47,7 @@ function weatherIcon(weather, gameMinutes) {
 }
 
 export function renderPanel(root, game, data, actions) {
-  const content = { plot: plotTab, storage: storageTab, kitchen: kitchenTab, workshop: workshopTab, lab: labTab, settings: settingsTab }[game.tab] ?? plotTab;
+  const content = { plot: plotTab, storage: storageTab, kitchen: kitchenTab, workshop: workshopTab, lab: labTab, smartfarm: smartfarmTab, settings: settingsTab }[game.tab] ?? plotTab;
   root.replaceChildren(
     el(
       "nav",

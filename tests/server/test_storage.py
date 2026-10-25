@@ -50,6 +50,18 @@ class StorageTest(unittest.TestCase):
             self.assertEqual(reopened["integrity"], "ok")
             self.assertEqual(reopened["state"]["meta"]["knownSpecies"], ["tomato", "tulip"])
 
+    def test_smartfarm_is_saved_and_signed(self):
+        with TempFarm() as farm:
+            store = farm.store()
+            state = store.load()["state"]
+            sf = {"dags": [{"id": "d", "name": "d", "schedule": "manual", "tasks": [{"id": "check", "block": "check_moisture"}], "edges": []}],
+                  "runs": {}, "history": [{"dagId": "d", "result": "success"}], "lastDaily": {}}
+            state["meta"]["smartfarm"] = sf
+            store.save(validate_save(save_request(state), RULES), NOW + 1000)
+            reopened = farm.store().load()
+            self.assertEqual(reopened["integrity"], "ok")
+            self.assertEqual(reopened["state"]["meta"]["smartfarm"], sf)
+
     def test_save_then_reopen_restores_same_state(self):
         with TempFarm() as farm:
             store = farm.store()

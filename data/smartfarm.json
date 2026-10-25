@@ -1,0 +1,44 @@
+{
+  "templates": [
+    {
+      "id": "bouquet_factory",
+      "name": "꽃다발 공장",
+      "about": "튤립을 심고, 그때 목마른 칸이 있으면 물을 준 뒤, 다 자라면 수확해서 꽃다발을 만들어요 (기다리는 동안 물은 \"아침 물 돌보기\"와 함께 쓰면 좋아요)",
+      "schedule": "manual",
+      "tasks": [
+        { "id": "plant", "block": "plant", "params": { "kind": "flowerbed", "species": "tulip" } },
+        { "id": "check", "block": "check_moisture", "params": { "skip": "water" } },
+        { "id": "water", "block": "water", "params": { "target": "thirsty" } },
+        { "id": "wait", "block": "wait_ripe", "params": { "kind": "flowerbed" }, "trigger": "none_failed" },
+        { "id": "harvest", "block": "harvest", "params": { "kind": "flowerbed" } },
+        { "id": "bouquet", "block": "craft", "params": { "craft": "tulip_bouquet" }, "retries": 1, "retryDelay": 30 }
+      ],
+      "edges": [["plant", "check"], ["check", "water"], ["water", "wait"], ["wait", "harvest"], ["harvest", "bouquet"]]
+    },
+    {
+      "id": "rice_lunch",
+      "name": "주먹밥 도시락",
+      "about": "논에 벼를 심고 물을 대고, 다 자라면 수확해서 주먹밥을 만들어요",
+      "schedule": "manual",
+      "tasks": [
+        { "id": "plant", "block": "plant", "params": { "kind": "paddy", "species": "rice" } },
+        { "id": "flood", "block": "water", "params": { "target": "paddy" } },
+        { "id": "wait", "block": "wait_ripe", "params": { "kind": "paddy" } },
+        { "id": "harvest", "block": "harvest", "params": { "kind": "paddy" } },
+        { "id": "lunch", "block": "cook", "params": { "recipe": "rice_ball" }, "retries": 2, "retryDelay": 60 }
+      ],
+      "edges": [["plant", "flood"], ["flood", "wait"], ["wait", "harvest"], ["harvest", "lunch"]]
+    },
+    {
+      "id": "morning_water",
+      "name": "아침 물 돌보기",
+      "about": "매일 아침 6시에 목마른 작물이 있는지 보고, 있을 때만 물을 줘요",
+      "schedule": "daily@06:00",
+      "tasks": [
+        { "id": "check", "block": "check_moisture", "params": { "skip": "water" } },
+        { "id": "water", "block": "water", "params": { "target": "thirsty" } }
+      ],
+      "edges": [["check", "water"]]
+    }
+  ]
+}

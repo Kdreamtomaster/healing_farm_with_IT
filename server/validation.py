@@ -6,6 +6,7 @@
 import json
 import math
 import re
+from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
 
 ITEM_ID = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
@@ -80,6 +81,8 @@ def validate_save(payload, rules: dict) -> dict:
         if any(not isinstance(s, str) or s not in rules["colors"] for s in known) or len(set(known)) != len(known):
             raise ValidationError("meta.knownSpecies 에 data/crops.json 에 없는 작물이나 겹치는 작물이 있어요")
         game_meta["knownSpecies"] = sorted(known)
+    if "smartfarm" in meta:
+        game_meta["smartfarm"] = _smartfarm(meta["smartfarm"])
 
     return {
         "meta": game_meta,
@@ -89,6 +92,61 @@ def validate_save(payload, rules: dict) -> dict:
         "inventory": inventory,
         "log": log,
     }
+
+
+# ── 스마트팜 (8단계): DAG 모양과 실행 상태. 브라우저가 계산하지만, 모양이 이상하면 저장하지 않아요 ──
+SMARTFARM_BLOCKS = {"plant", "check_moisture", "water", "wait_ripe", "harvest", "cook", "craft"}
+TASK_ID = re.compile(r"^[a-z][a-z0-9_]{0,23}$")
+SCHEDULE = re.compile(r"^(manual|daily@([01]\d|2[0-3]):[0-5]\d)$")
+TRIGGERS = {"all_success", "none_failed"}
+MAX_SMARTFARM_BYTES = 64 * 1024
+
+
+def _smartfarm(raw) -> dict:
+    sf = _dict(raw, "meta.smartfarm")
+    if len(json.dumps(sf)) > MAX_SMARTFARM_BYTES:
+        raise ValidationError("스마트팜 데이터가 너무 커요")
+    for i, dag in enumerate(_list(sf.get("dags", []), "meta.smartfarm.dags", 8)):
+        where = f"meta.smartfarm.dags[{i}]"
+        dag = _dict(dag, where)
+        _name(dag.get("id"), f"{where}.id")
+        _text(dag.get("name"), f"{where}.name", 40)
+        if not isinstance(dag.get("schedule"), str) or not SCHEDULE.match(dag["schedule"]):
+            raise ValidationError(f"{where}.schedule 은 manual 이나 daily@HH:MM 이어야 해요")
+        ids = set()
+        for j, task in enumerate(_list(dag.get("tasks"), f"{where}.tasks", 20)):
+            at = f"{where}.tasks[{j}]"
+            task = _dict(task, at)
+            ids.add(_name(task.get("id"), f"{at}.id"))
+            if task.get("block") not in SMARTFARM_BLOCKS:
+                raise ValidationError(f"{at}.block 은 아는 블록이 아니에요")
+            for key, value in _dict(task.get("params", {}), f"{at}.params").items():
+                _text(key, f"{at}.params", 20)
+                if not isinstance(value, (str, int, float)) or isinstance(value, bool) or len(str(value)) > 40:
+                    raise ValidationError(f"{at}.params.{key} 값이 올바르지 않아요")
+            _int(task.get("retries", 0), f"{at}.retries", 0, 5)
+            _number(task.get("retryDelay", 30), f"{at}.retryDelay", 0, 1440)
+            if task.get("trigger", "all_success") not in TRIGGERS:
+                raise ValidationError(f"{at}.trigger 는 all_success 나 none_failed 예요")
+        graph = {task_id: set() for task_id in ids}
+        for edge in _list(dag.get("edges", []), f"{where}.edges", 60):
+            if not isinstance(edge, list) or len(edge) != 2 or edge[0] not in ids or edge[1] not in ids:
+                raise ValidationError(f"{where}.edges 에 없는 블록을 잇는 화살표가 있어요")
+            graph[edge[1]].add(edge[0])
+        try:
+            tuple(TopologicalSorter(graph).static_order())  # 빙글 도는 길이 있으면 CycleError (docs/learn/05 의 실험과 같은 도구)
+        except CycleError as error:
+            raise ValidationError(f"{where} 에 빙글 도는 길이 있어요: {' → '.join(error.args[1])}") from None
+    _dict(sf.get("runs", {}), "meta.smartfarm.runs")
+    _list(sf.get("history", []), "meta.smartfarm.history", 20)
+    _dict(sf.get("lastDaily", {}), "meta.smartfarm.lastDaily")
+    return sf
+
+
+def _name(value, where: str) -> str:
+    if not isinstance(value, str) or not TASK_ID.match(value):
+        raise ValidationError(f"{where} 는 영어 소문자·숫자·_ 로 된 이름이어야 해요")
+    return value
 
 
 HEX_COLOR = re.compile(r"^#[0-9a-f]{6}$")

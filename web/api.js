@@ -18,6 +18,10 @@ export async function loadCrafts() {
   return (await getJson("/data/crafts.json", "공방 데이터")).crafts;
 }
 
+export async function loadSmartfarmTemplates() {
+  return (await getJson("/data/smartfarm.json", "스마트팜 틀")).templates;
+}
+
 export async function loadFriends() {
   return (await getJson("/data/friends.json", "친구 데이터")).friends;
 }

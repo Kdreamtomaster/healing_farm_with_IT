@@ -94,6 +94,26 @@ class ValidationTest(unittest.TestCase):
     def test_old_screen_without_known_species_is_fine(self):
         self.assertNotIn("knownSpecies", validate_save(save_request(self.state()), RULES)["meta"])
 
+    def smartfarm(self, **dag):
+        base = {"id": "morning", "name": "아침", "schedule": "daily@06:00",
+                "tasks": [{"id": "plant", "block": "plant", "params": {"kind": "field"}}, {"id": "water", "block": "water", "retries": 2}],
+                "edges": [["plant", "water"]]}
+        state = self.state()
+        state["meta"]["smartfarm"] = {"dags": [{**base, **dag}], "runs": {}, "history": [], "lastDaily": {}}
+        return state
+
+    def test_smartfarm_is_checked(self):
+        self.assertEqual(validate_save(save_request(self.smartfarm()), RULES)["meta"]["smartfarm"]["dags"][0]["id"], "morning")
+        for bad in (
+            {"edges": [["plant", "water"], ["water", "plant"]]},  # 빙글 도는 길
+            {"edges": [["plant", "ghost"]]},
+            {"schedule": "hourly"},
+            {"tasks": [{"id": "plant", "block": "teleport"}]},
+            {"tasks": [{"id": "Plant!", "block": "plant"}]},
+            {"tasks": [{"id": "plant", "block": "plant", "retries": 99}]},
+        ):
+            self.assert_rejected(self.smartfarm(**bad))
+
     def test_rejects_strange_item_name(self):
         state = self.state()
         state["inventory"]["<script>"] = 1

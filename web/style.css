@@ -177,6 +177,9 @@ main {
 
 .slots {
   display: flex;
+  flex-wrap: wrap; /* 좁은 화면에서는 두 줄로 (메뉴 바로가기가 9개라서) */
+  justify-content: center;
+  max-width: 100%;
   gap: 4px;
   padding: 4px;
   background: #e9dcc4;
@@ -633,6 +636,110 @@ button.swatch:disabled {
   gap: 3px;
   justify-content: flex-end;
   max-width: 50%;
+}
+
+/* 스마트팜: 블록 상태 색 (Airflow 처럼) */
+.st-none { --st: #eee6d6; }
+.st-waiting { --st: #d8cdb8; }
+.st-sensing { --st: #9cc8ec; }
+.st-up_for_retry { --st: #f2cc6a; }
+.st-success { --st: #8fcf7c; }
+.st-skipped { --st: #cfcfcf; }
+.st-failed { --st: #e8806e; }
+.st-upstream_failed { --st: #f4b090; }
+
+.dag {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 6px 0;
+}
+
+.dag-layer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  position: relative;
+}
+
+.dag-arrow {
+  width: 100%;
+  text-align: center;
+  color: var(--soft);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.dag-node {
+  display: flex;
+  flex-direction: column;
+  min-width: 120px;
+  max-width: 100%;
+  padding: 4px 8px;
+  border: 2px solid var(--line);
+  border-left: 8px solid var(--st);
+  border-radius: 6px;
+  background: var(--card);
+  font-size: 12px;
+}
+
+.dag-node small {
+  color: var(--soft);
+}
+
+.dag-node .dag-state {
+  margin-top: 2px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--st);
+  font-size: 11px;
+}
+
+.dag-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 4px 0;
+}
+
+.chip {
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--st);
+  font-size: 10px;
+}
+
+.dag-edit {
+  margin: 6px 0;
+  padding: 4px 6px;
+  border: 1px dashed var(--line-soft);
+  border-radius: 6px;
+}
+
+.toggle.inline {
+  display: inline-block;
+  margin: 0 6px 0 0;
+  font-size: 12px;
+}
+
+.dag-grid {
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.dag-grid th {
+  padding: 1px 6px 1px 0;
+  text-align: right;
+  font-weight: normal;
+}
+
+.dag-grid .cell {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--st);
 }
 
 /* 연구소 */

@@ -1,4 +1,4 @@
-# web/smartfarm/ — DAG로 만드는 스마트팜 (🚧 8단계)
+# web/smartfarm/ — DAG로 만드는 스마트팜 (✔ 8단계, 메뉴 `B`)
 
 ## 이 폴더는 왜 있나요? (기획안 7절)
 농사 작업에는 **순서**가 있어요. 씨앗을 심어야 물을 줄 수 있고, 다 자라야 수확할 수 있죠. 이 폴더는 농사 작업을 **DAG(방향이 있고 되돌아오지 않는 작업 흐름도)** 로 만들어 자동으로 실행하는 스마트팜 기능입니다. 게임을 하며 실제 데이터 파이프라인과 Apache Airflow의 핵심 개념을 체험하는 것이 목표예요.
@@ -63,15 +63,31 @@
 | Airflow 코드 내보내기 | 내 DAG 를 진짜 Airflow 파이썬 코드 모양으로 보여 줘서 실제 도구로 이어지게 |
 
 ## 저장
-- DAG 정의: 농장 세이브의 새 표 `dags` (지문 서명 범위 안 — 게임 상태라서)
-- 실행 이력: 새 표 `dag_runs` (작업 기록처럼 서명 밖)
+- DAG 정의와 실행 상태는 농장 세이브의 `meta.smartfarm` 에 들어가요 → 지문(HMAC) 서명 범위 안
+  - `{ dags: [...], runs: { DAG id: 실행 중인 상태 }, history: [최근 8번의 실행 결과], lastDaily: { DAG id: 마지막으로 매일 실행한 날 } }`
+  - 처음 설계(표 `dags`, `dag_runs`)보다 단순하게: 표를 늘리지 않아도 되고, 저장·서명·검증이 한 번에 돼요
+- 서버도 한 번 더 확인해요 (`server/validation.py` 의 `_smartfarm`): 아는 블록인지, 이름 모양, 재시도 횟수, 그리고 **빙글 도는 길이 없는지** — Python 의 `graphlib.TopologicalSorter` 로 (학습 문서 05 의 실험과 같은 도구)
+- 블록이 한 일은 작업 기록(`task_log`)에 `actor: smartfarm` 으로 남아요
 
-## 들어올 파일 (예정 — 설계는 [docs/PLAN.md](../../docs/PLAN.md) 8단계)
-- `dag.js` — DAG 검사(빠진 블록, 순환과 도는 길), 위상 정렬, 깊이(그래프 층) 계산
-- `blocks.js` — 블록 목록과 각 블록이 부르는 `farm/`·`friends/` 규칙
-- `runner.js` — 상태 기계, 실행 조건, 재시도, 연료, 스케줄
-- `airflow.js` — DAG → Airflow 파이썬 코드 글자로 바꾸기
-- `web/ui/smartfarm-panel.js` — 블록 잇기, 그래프 보기, 실행 격자 보기
+## 파일
+| 파일 | 하는 일 |
+|---|---|
+| `dag.js` | 위상 정렬(Kahn), 빙글 도는 길 찾기, 그래프 층(깊이), 화살표 잇기 검사, DAG 모양 검사 |
+| `blocks.js` | 블록 7가지와 각 블록이 부르는 `farm/`·`friends/` 규칙, 센서 간격(30분)·제한 시간(하루) |
+| `runner.js` | 상태 기계, 실행 조건, 재시도, 연료, 매일 스케줄, 실행 기록 (`tickSmartfarm`) |
+| `editor.js` | 블록 더하기·빼기, 화살표 잇기·끊기(순환이면 거부), 설정 바꾸기, 틀로 만들기 |
+| `airflow.js` | DAG → Airflow 파이썬 코드 글자 |
+| `data/smartfarm.json` | 틀 3가지: 꽃다발 공장, 주먹밥 도시락, 아침 물 돌보기 |
+| `web/ui/smartfarm-panel.js` | 자동화 탭: 그래프(층마다 한 줄), 블록 고치기, 실행 기록 격자, Airflow 코드 |
+
+비운 시간 동안에도 같은 함수가 10분 조각마다 돌아요 (`web/time/offline.js` 의 `simulateOffline` 에 넘기는 `machines`). 친구들보다 먼저 일해요.
+
+## 해 보기
+1. 🌱 연구소(`L`)에서 수확물을 바이오 연료로 바꾼 뒤, 자동화(`B`)에서 "꽃다발 공장" 틀로 만들고 ▶ 지금 실행
+2. 🌱 블록 색 보기: 심기 성공 → 촉촉하면 물주기 "건너뜀" → 다 자랄 때까지 "기다리는 중" → 수확 → 꽃다발
+3. 🌱 "블록 고치기"에서 bouquet → plant 처럼 빙글 도는 화살표를 이어 보기 → 거부되고 도는 길을 알려 줘요
+4. 🌱 연료가 0개일 때 실행해 보기 → 실패 → (재시도 설정이 있으면) 다시 시도 대기 → 뒤 블록은 "앞 단계 실패". 작물은 무사해요
+5. 🌿 "Airflow 코드로 보기"를 진짜 Airflow 문서의 예제와 비교해 보기
 
 ## 더 읽기
 - [docs/learn/05-automation-dag-and-airflow.md](../../docs/learn/05-automation-dag-and-airflow.md)

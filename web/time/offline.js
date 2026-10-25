@@ -23,13 +23,15 @@ export function newReport() {
 
 // minutes(게임 분)를 10분 조각으로 나눠, 조각마다 작물이 자라고 친구들이 돌봅니다.
 // report 에 친구들이 한 일이 쌓입니다. 여러 번 나눠 불러도 같은 report 를 넘기면 이어서 쌓여요.
-export function simulateOffline(state, speciesById, friends, minutes, report = newReport()) {
+// machines(state): 조각마다 스마트팜이 할 일을 해요 (친구들보다 먼저, 플레이 중과 같은 함수)
+export function simulateOffline(state, speciesById, friends, minutes, report = newReport(), machines = null) {
   let left = minutes;
   while (left > 0) {
     const dt = Math.min(CHUNK_MINUTES, left);
     left -= dt;
     if (isRaining(state.meta.gameMinutes, farmSeed(state))) report.rainMinutes += dt;
     advanceFarm(state, speciesById, dt);
+    machines?.(state);
     friendsHelp(state, speciesById, friends, report);
     report.minutes += dt;
   }
