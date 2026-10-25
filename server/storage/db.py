@@ -14,7 +14,8 @@ SCHEMA_FILE = Path(__file__).with_name("schema.sql")
 REQUIRED_TABLES = {"meta", "plots", "crops", "inventory", "task_log", "integrity"}
 
 # 저장 요청으로 브라우저가 바꿀 수 있는 meta 값. 나머지는 서버만 씁니다.
-GAME_META_KEYS = ("gameMinutes", "playSeconds", "timeScale")
+# knownSpecies: 이 농장이 이미 아는 작물들 (새 작물이 추가되면 씨앗을 한 번 선물하려고 기억해요)
+GAME_META_KEYS = ("gameMinutes", "playSeconds", "timeScale", "knownSpecies")
 
 
 def connect(path: Path) -> sqlite3.Connection:
@@ -47,7 +48,7 @@ def create_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA_FILE.read_text(encoding="utf-8"))
 
 
-def fill_new_farm(conn: sqlite3.Connection, start: dict, now: int) -> None:
+def fill_new_farm(conn: sqlite3.Connection, start: dict, now: int, species=()) -> None:
     """data/start.json 내용으로 새 농장의 표를 채웁니다."""
     legend = start["legend"]
     plots = []
@@ -68,6 +69,7 @@ def fill_new_farm(conn: sqlite3.Connection, start: dict, now: int) -> None:
         "gameMinutes": 0,
         "playSeconds": 0,
         "timeScale": start["timeScale"],
+        "knownSpecies": sorted(species),  # 새 농장은 지금 있는 작물을 다 알고 시작해요
     }.items():
         set_meta(conn, key, value)
 
@@ -152,7 +154,8 @@ def write_game(conn: sqlite3.Connection, game: dict, now: int) -> None:
         [(item, count) for item, count in sorted(game["inventory"].items()) if count > 0],
     )
     for key in GAME_META_KEYS:
-        set_meta(conn, key, game["meta"][key])
+        if key in game["meta"]:
+            set_meta(conn, key, game["meta"][key])
     set_meta(conn, "lastSavedAt", now)
 
 

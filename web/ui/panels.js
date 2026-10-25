@@ -125,34 +125,50 @@ function cropInfo(plot, data, actions) {
   );
 }
 
-// 빈 칸: 씨앗과 색 고르기. 고른 씨앗은 씨앗 도구(3)에도 기억돼요.
+// 빈 칸: 작물 그림을 골라 → 색을 누르면 심어요. 고른 씨앗은 씨앗 도구(3)에도 기억돼요.
+// 작물이 많아도 스크롤하지 않도록, 작물은 작은 그림 칸으로 늘어놓고 색은 고른 작물 것만 보여 줘요.
+const WATER_WORDS = { low: "물을 조금", mid: "물을 알맞게", high: "물을 듬뿍" };
 function seedPicker(plot, game, data, actions) {
   const seeds = data.speciesList.filter((s) => PLOT_FOR_TYPE[s.type] === plot.kind);
+  const count = (s) => itemCount(game.state, seedId(s.id));
+  const chosen = game.seedChoice[plot.kind];
+  const focus = seeds.find((s) => s.id === chosen?.speciesId) ?? seeds.find((s) => count(s) > 0) ?? seeds[0];
+  const hours = Math.round((focus.growMinutes / 60) * 10) / 10;
   return el(
     "div",
     {},
-    el("p", { class: "hint" }, "심을 색을 골라요. 마우스를 올리면 다 자란 모습을 미리 볼 수 있어요."),
-    seeds.map((s) => {
-      const count = itemCount(game.state, seedId(s.id));
-      return el(
-        "div",
-        { class: "seed-row" },
-        el("img", { class: "mini-icon", src: data.icons.seed(s.id), alt: "" }),
-        el("span", { class: "seed-name" }, `${s.name.ko} `, el("small", {}, `씨앗 ${count}`)),
+    el(
+      "div",
+      { class: "seed-grid" },
+      seeds.map((s) =>
         el(
-          "div",
-          { class: "swatches" },
-          s.colors.map((color) =>
-            swatch(color.hex, color.name, {
-              disabled: count === 0,
-              onclick: () => actions.plant(s.id, color.id),
-              onmouseenter: () => actions.preview(s.id, color.id),
-              onmouseleave: () => actions.preview(null),
-            }),
-          ),
+          "button",
+          {
+            class: ["seed-tile", s === focus && "selected", count(s) === 0 && "empty"].filter(Boolean).join(" "),
+            title: `${s.name.ko} 씨앗 ${count(s)}개`,
+            "aria-pressed": String(s === focus),
+            onclick: () => actions.pickSeed(s.id),
+          },
+          el("img", { src: data.icons.crop(s.id, s.colors[0].id), alt: "" }),
+          el("span", {}, s.name.ko),
+          el("small", { class: "count" }, String(count(s))),
         ),
-      );
-    }),
+      ),
+    ),
+    el("p", { class: "hint" }, `${focus.name.ko} 씨앗 ${count(focus)}개 · 게임 속 ${hours}시간이면 다 자라요 · ${WATER_WORDS[focus.water]} 좋아해요`),
+    el(
+      "div",
+      { class: "swatches" },
+      focus.colors.map((color) =>
+        swatch(color.hex, `${josa(color.name, "으로", "로")} 심기`, {
+          disabled: count(focus) === 0,
+          onclick: () => actions.plant(focus.id, color.id),
+          onmouseenter: () => actions.preview(focus.id, color.id),
+          onmouseleave: () => actions.preview(null),
+        }),
+      ),
+    ),
+    count(focus) === 0 && el("p", { class: "hint" }, "씨앗이 없어요. 다 자란 작물을 수확하면 씨앗도 얻어요."),
   );
 }
 
@@ -213,6 +229,35 @@ function storageTab(game, data) {
 function kitchenTab(game, data, actions) {
   const { state } = game;
   const cooked = data.recipes.filter((r) => itemCount(state, `dish_${r.id}`) > 0);
+  const canCook = (recipe) => Object.entries(recipe.ingredients).every(([item, need]) => itemCount(state, item) >= need);
+  const ready = data.recipes.filter(canCook);
+  const waiting = data.recipes.filter((r) => !canCook(r));
+  const recipeRow = (recipe, ok) =>
+    el(
+      "div",
+      { class: ok ? "recipe-row" : "recipe-row dim" },
+      el("img", { class: "dish-icon", src: data.icons.dish(recipe.id), alt: "" }),
+      el(
+        "span",
+        { class: "recipe-name" },
+        recipe.name.ko,
+        el(
+          "span",
+          { class: "needs" },
+          Object.entries(recipe.ingredients).map(([item, need]) => {
+            const species = data.speciesById.get(item);
+            const have = itemCount(state, item);
+            return el(
+              "span",
+              { class: have >= need ? "need ok" : "need" },
+              el("img", { src: data.icons.crop(item, species.colors[0].id), alt: species.name.ko, title: species.name.ko }),
+              `${have}/${need}`,
+            );
+          }),
+        ),
+      ),
+      el("button", { class: "small", disabled: !ok, onclick: () => actions.cook(recipe.id) }, "요리하기"),
+    );
   return [
     el("h2", {}, "부엌"),
     el("p", { class: "hint" }, "작물이 모이면 화덕에서 요리해요. 요리는 친구들과 돗자리에 둘러앉아 나눠 먹어요."),
@@ -227,34 +272,14 @@ function kitchenTab(game, data, actions) {
       ),
     ),
     el("h3", {}, "🍳 요리하기"),
-    data.recipes.map((recipe) => {
-      const ready = Object.entries(recipe.ingredients).every(([item, need]) => itemCount(state, item) >= need);
-      return el(
-        "div",
-        { class: ready ? "recipe-row" : "recipe-row dim" },
-        el("img", { class: "dish-icon", src: data.icons.dish(recipe.id), alt: "" }),
-        el(
-          "span",
-          { class: "recipe-name" },
-          recipe.name.ko,
-          el(
-            "span",
-            { class: "needs" },
-            Object.entries(recipe.ingredients).map(([item, need]) => {
-              const species = data.speciesById.get(item);
-              const have = itemCount(state, item);
-              return el(
-                "span",
-                { class: have >= need ? "need ok" : "need" },
-                el("img", { src: data.icons.crop(item, species.colors[0].id), alt: species.name.ko, title: species.name.ko }),
-                `${have}/${need}`,
-              );
-            }),
-          ),
-        ),
-        el("button", { class: "small", disabled: !ready, onclick: () => actions.cook(recipe.id) }, "요리하기"),
-      );
-    }),
+    ready.length ? ready.map((recipe) => recipeRow(recipe, true)) : el("p", { class: "hint" }, "지금은 재료가 모자라요. 수확해서 모아 보세요."),
+    waiting.length > 0 &&
+      el(
+        "details",
+        { class: "more", open: Boolean(game.ui?.moreRecipes), ontoggle: (e) => actions.remember("moreRecipes", e.target.open) },
+        el("summary", {}, `재료를 모으는 중인 요리 ${waiting.length}가지`),
+        waiting.map((recipe) => recipeRow(recipe, false)),
+      ),
   ];
 }
 

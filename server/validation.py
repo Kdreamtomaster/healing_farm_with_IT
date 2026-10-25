@@ -68,12 +68,19 @@ def validate_save(payload, rules: dict) -> dict:
             "detail": _text(entry.get("detail", ""), f"log[{i}].detail", 200),
         })
 
+    game_meta = {
+        "gameMinutes": _number(meta.get("gameMinutes"), "meta.gameMinutes", 0, 1e12),
+        "playSeconds": _number(meta.get("playSeconds"), "meta.playSeconds", 0, 1e12),
+        "timeScale": _number(meta.get("timeScale"), "meta.timeScale", 0.1, 1000),
+    }
+    if "knownSpecies" in meta:  # 옛 화면은 보내지 않아서, 있을 때만 확인하고 저장해요
+        known = _list(meta["knownSpecies"], "meta.knownSpecies", len(rules["colors"]))
+        if any(not isinstance(s, str) or s not in rules["colors"] for s in known) or len(set(known)) != len(known):
+            raise ValidationError("meta.knownSpecies 에 data/crops.json 에 없는 작물이나 겹치는 작물이 있어요")
+        game_meta["knownSpecies"] = sorted(known)
+
     return {
-        "meta": {
-            "gameMinutes": _number(meta.get("gameMinutes"), "meta.gameMinutes", 0, 1e12),
-            "playSeconds": _number(meta.get("playSeconds"), "meta.playSeconds", 0, 1e12),
-            "timeScale": _number(meta.get("timeScale"), "meta.timeScale", 0.1, 1000),
-        },
+        "meta": game_meta,
         "layout": layout,
         "borders": borders,
         "crops": crops,

@@ -11,7 +11,17 @@
   "inventory": {
     "seed_tomato": 4,
     "seed_potato": 4,
+    "seed_carrot": 2,
+    "seed_strawberry": 2,
+    "seed_cabbage": 2,
+    "seed_corn": 2,
+    "seed_pumpkin": 2,
     "seed_rice": 4,
-    "seed_tulip": 4
+    "seed_black_rice": 2,
+    "seed_lotus": 2,
+    "seed_tulip": 4,
+    "seed_sunflower": 2,
+    "seed_cosmos": 2,
+    "seed_lavender": 2
   }
 }

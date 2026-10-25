@@ -35,6 +35,21 @@ class StorageTest(unittest.TestCase):
             self.assertEqual(loaded["state"]["inventory"]["seed_tomato"], 4)
             self.assertEqual(loaded["integrity"], "ok")
 
+    def test_new_farm_knows_every_species(self):
+        with TempFarm() as farm:
+            meta = farm.store().load()["state"]["meta"]
+            self.assertEqual(meta["knownSpecies"], sorted(RULES["colors"]))
+
+    def test_known_species_is_saved_and_signed(self):
+        with TempFarm() as farm:
+            store = farm.store()
+            state = store.load()["state"]
+            state["meta"]["knownSpecies"] = ["tulip", "tomato"]
+            store.save(validate_save(save_request(state), RULES), NOW + 1000)
+            reopened = farm.store().load()
+            self.assertEqual(reopened["integrity"], "ok")
+            self.assertEqual(reopened["state"]["meta"]["knownSpecies"], ["tomato", "tulip"])
+
     def test_save_then_reopen_restores_same_state(self):
         with TempFarm() as farm:
             store = farm.store()

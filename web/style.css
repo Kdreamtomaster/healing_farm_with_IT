@@ -409,21 +409,62 @@ button.mini.color::before {
   background: #5aa9e6;
 }
 
-.seed-row {
+/* 씨앗 고르기: 작물 그림 칸 */
+.seed-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+  gap: 4px;
+  margin: 4px 0 6px;
+}
+
+button.seed-tile {
+  position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
+  gap: 1px;
+  padding: 3px 2px;
+  background: #f3ead8;
+  color: var(--ink);
+  border-color: var(--line-soft);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+button.seed-tile img {
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
+}
+
+button.seed-tile .count {
+  position: absolute;
+  top: 1px;
+  right: 4px;
+  font-weight: bold;
+}
+
+button.seed-tile.selected {
+  border-color: var(--accent-dark);
+  outline: 2px solid var(--gold);
+  background: #fff7e6;
+}
+
+button.seed-tile.empty img,
+button.seed-tile.empty span {
+  opacity: 0.45;
+}
+
+/* 접어 둔 목록 (재료를 모으는 중인 요리 등) */
+details.more {
   margin-top: 6px;
 }
 
-.seed-name {
-  min-width: 72px;
-  font-size: 14px;
-}
-
-.seed-name small {
+details.more summary {
+  cursor: pointer;
+  font-size: 13px;
   color: var(--soft);
+  margin-bottom: 4px;
 }
 
 .swatches {

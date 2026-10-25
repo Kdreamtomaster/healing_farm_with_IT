@@ -7,6 +7,14 @@
     { "id": "potato_pancake", "name": { "ko": "감자전", "en": "Potato Pancake" }, "ingredients": { "potato": 2 } },
     { "id": "potato_salad", "name": { "ko": "감자 샐러드", "en": "Potato Salad" }, "ingredients": { "potato": 2, "tomato": 1 } },
     { "id": "omurice", "name": { "ko": "오므라이스", "en": "Omurice" }, "ingredients": { "rice": 2, "tomato": 1 } },
-    { "id": "tomato_risotto", "name": { "ko": "토마토 리조또", "en": "Tomato Risotto" }, "ingredients": { "rice": 2, "tomato": 2 } }
+    { "id": "tomato_risotto", "name": { "ko": "토마토 리조또", "en": "Tomato Risotto" }, "ingredients": { "rice": 2, "tomato": 2 } },
+    { "id": "carrot_cake", "name": { "ko": "당근 케이크", "en": "Carrot Cake" }, "ingredients": { "carrot": 3 } },
+    { "id": "strawberry_jam", "name": { "ko": "딸기잼", "en": "Strawberry Jam" }, "ingredients": { "strawberry": 4 } },
+    { "id": "grilled_corn", "name": { "ko": "군옥수수", "en": "Grilled Corn" }, "ingredients": { "corn": 2 } },
+    { "id": "corn_soup", "name": { "ko": "옥수수 수프", "en": "Corn Soup" }, "ingredients": { "corn": 2, "potato": 1 } },
+    { "id": "pumpkin_soup", "name": { "ko": "호박 수프", "en": "Pumpkin Soup" }, "ingredients": { "pumpkin": 2 } },
+    { "id": "coleslaw", "name": { "ko": "코울슬로", "en": "Coleslaw" }, "ingredients": { "cabbage": 1, "carrot": 1 } },
+    { "id": "vegetable_stew", "name": { "ko": "채소 스튜", "en": "Vegetable Stew" }, "ingredients": { "carrot": 1, "potato": 1, "cabbage": 1 } },
+    { "id": "black_rice_bowl", "name": { "ko": "흑미밥", "en": "Black Rice Bowl" }, "ingredients": { "black_rice": 2, "rice": 1 } }
   ]
 }

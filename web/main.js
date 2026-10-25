@@ -6,7 +6,8 @@ import { applyBorderToKind, setBorder } from "./decor/plots-style.js";
 import { seasonOf } from "./decor/season.js";
 import { nextKitchenTask, nextTask } from "./farm/autopilot.js";
 import { BULK, bulkTargets, flood, water } from "./farm/care.js";
-import { advanceFarm } from "./farm/crops.js";
+import { advanceFarm, PLOT_FOR_TYPE } from "./farm/crops.js";
+import { giftMessage, giftNewSeeds } from "./farm/seed-gift.js";
 import { harvest, plant } from "./farm/harvest.js";
 import { cycleColor, cycleSeed, seedFor, smartTask, toolTask } from "./farm/tools.js";
 import { farmSeed, weatherAt } from "./farm/weather.js";
@@ -93,6 +94,7 @@ const game = {
   tab: prefs.tab ?? "plot",
   // 메뉴: dock(옆에 붙이기) · float(농장 위 팝업) · window(새 창)
   menu: { mode: "dock", floatOpen: false, folded: Boolean(prefs.folded) },
+  ui: {}, // 접어 둔 목록을 펼쳤는지 같은 작은 화면 상태
 };
 
 // 농장 상태가 몇 시(현실 시각, ms)까지 계산되어 있는지
@@ -304,6 +306,21 @@ const actions = {
     game.seedFocus = species.id;
     savePrefs();
     sendWorker(selectedPlot(), { kind: "plant", speciesId, colorId });
+  },
+  // 밭 탭에서 작물 그림을 고르면: 그 칸 종류에 심을 씨앗으로 기억해요 (색은 전에 고른 색 그대로)
+  pickSeed(speciesId) {
+    const species = speciesById.get(speciesId);
+    const kind = PLOT_FOR_TYPE[species.type];
+    const before = game.seedChoice[kind];
+    const colorId = before?.speciesId === speciesId ? before.colorId : species.colors[0].id;
+    game.seedChoice = { ...game.seedChoice, [kind]: { speciesId, colorId } };
+    game.seedFocus = speciesId;
+    savePrefs();
+    draw();
+  },
+  // 접었다 편 메뉴처럼, 다시 그려도 그대로 두고 싶은 화면 상태
+  remember(key, value) {
+    game.ui[key] = value;
   },
   preview(speciesId, colorId) {
     game.preview = speciesId ? { plotId: game.selectedId, speciesId, colorId } : null;
@@ -551,6 +568,7 @@ function draw() {
     crop && [crop.species, Math.floor(crop.progress * 100), Math.round(crop.moisture)],
     game.state.inventory,
     game.state.meta.timeScale,
+    game.seedChoice,
   ]);
   if (root && key !== panelKey) {
     panelKey = key;
@@ -758,10 +776,14 @@ if (boot.recovery) {
       : "세이브 파일이 깨졌고 백업이 없어 새 농장으로 시작해요",
   );
 }
+// 게임에 새 작물이 늘었으면 씨앗을 한 번 선물해요 (아래 catchUp 이 끝나면 함께 저장돼요)
+const gifts = giftNewSeeds(game.state, speciesList);
+if (gifts.length) record("gift", gifts.map((s) => s.id).join(","), "system");
 busy = true;
 showProgress("농장으로 가는 중…", 0);
 await catchUp(game.state.meta.lastSavedAt, boot.serverNow); // 마지막 저장부터 지금까지 (끝나면 저장)
 busy = false;
+if (gifts.length) showToast(giftMessage(gifts));
 startAutosave(save);
 setInterval(tick, 1000);
 setInterval(idleStep, IDLE_STEP_MS);

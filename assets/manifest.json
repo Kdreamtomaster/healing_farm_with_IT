@@ -8,8 +8,18 @@
     "ids": [
       "tomato",
       "potato",
+      "carrot",
+      "strawberry",
+      "cabbage",
+      "corn",
+      "pumpkin",
       "rice",
-      "tulip"
+      "black_rice",
+      "lotus",
+      "tulip",
+      "sunflower",
+      "cosmos",
+      "lavender"
     ],
     "frames": {
       "seed": 1,
@@ -45,6 +55,14 @@
     "potato_pancake",
     "potato_salad",
     "omurice",
-    "tomato_risotto"
+    "tomato_risotto",
+    "carrot_cake",
+    "strawberry_jam",
+    "grilled_corn",
+    "corn_soup",
+    "pumpkin_soup",
+    "coleslaw",
+    "vegetable_stew",
+    "black_rice_bowl"
   ]
 }

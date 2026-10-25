@@ -69,22 +69,39 @@ function drawFruit(ctx, x, y, hex) {
   ctx.fillRect(x, y, 1, 1);
 }
 
-// 창고 풍경: 작물마다 상자 하나(수확물이 쌓임)와 씨앗 자루(씨앗이 많을수록 자루가 늘어남)
+// 창고 마당에 놓을 자리는 상자 4개·자루 4묶음뿐이라, 가장 많이 쌓인 작물부터 골라요.
+// 고른 작물은 data/crops.json 순서대로 놓아서, 개수가 조금 바뀌어도 자리가 자꾸 뒤바뀌지 않아요.
+export const STORAGE_SLOTS = 4;
+export function storagePicks(state, speciesList, itemOf, slots = STORAGE_SLOTS) {
+  const count = (s) => state.inventory[itemOf(s)] ?? 0;
+  const top = new Set(
+    speciesList
+      .filter((s) => count(s) > 0)
+      .sort((a, b) => count(b) - count(a))
+      .slice(0, slots),
+  );
+  return speciesList.filter((s) => top.has(s));
+}
+
+// 창고 풍경: 수확물 상자(수확물이 쌓임)와 씨앗 자루(씨앗이 많을수록 자루가 늘어남). 빈자리는 빈 상자.
 export function drawStorage(ctx, layout, state, speciesList, sprites) {
-  speciesList.forEach((species, i) => {
-    const hex = species.colors[0].hex;
-    // 수확물 상자
+  const produce = storagePicks(state, speciesList, (s) => s.id);
+  for (let i = 0; i < STORAGE_SLOTS; i++) {
     const cx = layout.crates.x + i * TILE;
     const cy = layout.crates.y;
-    const produce = Math.min(PILE.length, state.inventory[species.id] ?? 0);
     ctx.drawImage(sprites.scenery("crate_1"), cx, cy);
-    for (const [px, row] of PILE.slice(0, produce)) drawFruit(ctx, Math.round(cx + px), cy + 6 - row * 3, hex);
-    // 씨앗 자루: 씨앗 3개마다 한 자루, 최대 3자루 (2개 위에 1개)
-    const seeds = state.inventory[`seed_${species.id}`] ?? 0;
+    const species = produce[i];
+    if (!species) continue;
+    const pile = Math.min(PILE.length, state.inventory[species.id]);
+    for (const [px, row] of PILE.slice(0, pile)) drawFruit(ctx, Math.round(cx + px), cy + 6 - row * 3, species.colors[0].hex);
+  }
+  // 씨앗 자루: 씨앗 3개마다 한 자루, 최대 3자루 (2개 위에 1개)
+  storagePicks(state, speciesList, (s) => `seed_${s.id}`).forEach((species, i) => {
+    const seeds = state.inventory[`seed_${species.id}`];
     const sacks = Math.min(3, Math.ceil(seeds / 3));
     const sx = layout.sacks.x + i * TILE;
     const sy = layout.sacks.y;
     const spots = [[-2, 4], [4, 4], [1, -1]];
-    for (const [dx, dy] of spots.slice(0, sacks)) ctx.drawImage(sprites.scenery("sack_1", hex), sx + dx, sy + dy);
+    for (const [dx, dy] of spots.slice(0, sacks)) ctx.drawImage(sprites.scenery("sack_1", species.colors[0].hex), sx + dx, sy + dy);
   });
 }

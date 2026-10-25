@@ -114,7 +114,7 @@ class FarmStore:
         만드는 도중 꺼져도 반쯤 만들어진 farm.sqlite 가 남지 않습니다.
         (os.replace 는 "바꾸기 전" 아니면 "바꾼 후" 둘 중 하나만 일어나는 동작이에요)
         """
-        start = json.loads((self.data_dir / "start.json").read_text(encoding="utf-8"))
+        game_data = self._game_data()
         tmp_path = self.db_path.with_name(self.db_path.name + ".new")
         leftovers = [tmp_path] + [p.with_name(p.name + s) for p in (tmp_path, self.db_path) for s in ("-wal", "-shm")]
         for path in leftovers:
@@ -123,7 +123,7 @@ class FarmStore:
             db.create_schema(conn)
             conn.execute("BEGIN")
             try:
-                db.fill_new_farm(conn, start, now)
+                db.fill_new_farm(conn, game_data["start"], now, [c["id"] for c in game_data["crops"]])
                 db.write_digest(conn, hashing.ALGO, hashing.digest(db.read_state(conn), self._key))
                 conn.execute("COMMIT")
             except BaseException:

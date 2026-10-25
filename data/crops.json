@@ -27,6 +27,71 @@
       ]
     },
     {
+      "id": "carrot",
+      "name": { "ko": "당근", "en": "Carrot" },
+      "type": "field",
+      "water": "mid",
+      "growMinutes": 150,
+      "yield": 3,
+      "seeds": 2,
+      "colors": [
+        { "id": "orange", "name": "주황", "hex": "#e8862e" },
+        { "id": "purple", "name": "보라", "hex": "#8a4a9a" }
+      ]
+    },
+    {
+      "id": "strawberry",
+      "name": { "ko": "딸기", "en": "Strawberry" },
+      "type": "field",
+      "water": "mid",
+      "growMinutes": 200,
+      "yield": 4,
+      "seeds": 2,
+      "colors": [
+        { "id": "red", "name": "빨강", "hex": "#e0404a" },
+        { "id": "white", "name": "하양", "hex": "#f2ecdc" }
+      ]
+    },
+    {
+      "id": "cabbage",
+      "name": { "ko": "양배추", "en": "Cabbage" },
+      "type": "field",
+      "water": "high",
+      "growMinutes": 260,
+      "yield": 2,
+      "seeds": 2,
+      "colors": [
+        { "id": "green", "name": "초록", "hex": "#a6d468" },
+        { "id": "purple", "name": "보라", "hex": "#8a5aa8" }
+      ]
+    },
+    {
+      "id": "corn",
+      "name": { "ko": "옥수수", "en": "Corn" },
+      "type": "field",
+      "water": "mid",
+      "growMinutes": 300,
+      "yield": 3,
+      "seeds": 2,
+      "colors": [
+        { "id": "yellow", "name": "노랑", "hex": "#f2cc4a" },
+        { "id": "white", "name": "하양", "hex": "#efe6c4" }
+      ]
+    },
+    {
+      "id": "pumpkin",
+      "name": { "ko": "호박", "en": "Pumpkin" },
+      "type": "field",
+      "water": "low",
+      "growMinutes": 420,
+      "yield": 2,
+      "seeds": 2,
+      "colors": [
+        { "id": "orange", "name": "주황", "hex": "#e8862e" },
+        { "id": "green", "name": "초록", "hex": "#5f8f3e" }
+      ]
+    },
+    {
       "id": "rice",
       "name": { "ko": "벼", "en": "Rice" },
       "type": "paddy",
@@ -36,6 +101,31 @@
       "seeds": 2,
       "colors": [
         { "id": "gold", "name": "황금", "hex": "#e8c84a" }
+      ]
+    },
+    {
+      "id": "black_rice",
+      "name": { "ko": "흑미", "en": "Black rice" },
+      "type": "paddy",
+      "water": "high",
+      "growMinutes": 380,
+      "yield": 4,
+      "seeds": 2,
+      "colors": [
+        { "id": "black", "name": "검정", "hex": "#4a3048" }
+      ]
+    },
+    {
+      "id": "lotus",
+      "name": { "ko": "연꽃", "en": "Lotus" },
+      "type": "paddy",
+      "water": "high",
+      "growMinutes": 240,
+      "yield": 1,
+      "seeds": 2,
+      "colors": [
+        { "id": "pink", "name": "분홍", "hex": "#f29ab8" },
+        { "id": "white", "name": "하양", "hex": "#f4f0ea" }
       ]
     },
     {
@@ -51,6 +141,46 @@
         { "id": "yellow", "name": "노랑", "hex": "#f4d04a" },
         { "id": "purple", "name": "보라", "hex": "#a36fd6" },
         { "id": "white", "name": "하양", "hex": "#f2f0e8" }
+      ]
+    },
+    {
+      "id": "sunflower",
+      "name": { "ko": "해바라기", "en": "Sunflower" },
+      "type": "flower",
+      "water": "mid",
+      "growMinutes": 240,
+      "yield": 1,
+      "seeds": 2,
+      "colors": [
+        { "id": "yellow", "name": "노랑", "hex": "#f4c430" },
+        { "id": "orange", "name": "주황", "hex": "#e8862e" }
+      ]
+    },
+    {
+      "id": "cosmos",
+      "name": { "ko": "코스모스", "en": "Cosmos" },
+      "type": "flower",
+      "water": "low",
+      "growMinutes": 150,
+      "yield": 1,
+      "seeds": 2,
+      "colors": [
+        { "id": "pink", "name": "분홍", "hex": "#ef8ab0" },
+        { "id": "white", "name": "하양", "hex": "#f4eee8" },
+        { "id": "magenta", "name": "자주", "hex": "#c04a8a" }
+      ]
+    },
+    {
+      "id": "lavender",
+      "name": { "ko": "라벤더", "en": "Lavender" },
+      "type": "flower",
+      "water": "low",
+      "growMinutes": 180,
+      "yield": 1,
+      "seeds": 2,
+      "colors": [
+        { "id": "purple", "name": "보라", "hex": "#9a7ad6" },
+        { "id": "lilac", "name": "연보라", "hex": "#c8b4ec" }
       ]
     }
   ]

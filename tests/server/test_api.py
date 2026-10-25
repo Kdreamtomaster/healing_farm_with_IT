@@ -83,6 +83,17 @@ class ValidationTest(unittest.TestCase):
         state["meta"]["gameMinutes"] = float("nan")
         self.assert_rejected(state)
 
+    def test_known_species_must_be_real_species(self):
+        state = self.state()
+        state["meta"]["knownSpecies"] = ["tomato", "tulip"]
+        self.assertEqual(validate_save(save_request(state), RULES)["meta"]["knownSpecies"], ["tomato", "tulip"])
+        for bad in (["dragonfruit"], ["tomato", "tomato"], [{"id": "tomato"}], "tomato"):
+            state["meta"]["knownSpecies"] = bad
+            self.assert_rejected(state)
+
+    def test_old_screen_without_known_species_is_fine(self):
+        self.assertNotIn("knownSpecies", validate_save(save_request(self.state()), RULES)["meta"])
+
     def test_rejects_strange_item_name(self):
         state = self.state()
         state["inventory"]["<script>"] = 1
