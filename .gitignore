@@ -1,0 +1,13 @@
+# 개인 세이브 데이터는 Git에 올리지 않습니다 (saves/README.md 참고)
+saves/*
+!saves/README.md
+
+# Python
+__pycache__/
+*.pyc
+
+# OS / 편집기
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
