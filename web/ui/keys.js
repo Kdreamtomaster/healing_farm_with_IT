@@ -20,6 +20,7 @@ export const KEYMAP = [
   { group: "메뉴", keys: ["p"], label: "P", command: "tab:plot", text: "밭 메뉴" },
   { group: "메뉴", keys: ["i"], label: "I", command: "tab:storage", text: "창고 메뉴" },
   { group: "메뉴", keys: ["k"], label: "K", command: "tab:kitchen", text: "부엌 메뉴" },
+  { group: "메뉴", keys: ["g"], label: "G", command: "tab:workshop", text: "꽃 공방 메뉴" },
   { group: "메뉴", keys: ["o"], label: "O", command: "tab:settings", text: "설정 메뉴" },
   { group: "메뉴", keys: ["h"], label: "H", command: "menu:toggle", text: "메뉴 접기·펴기 (접으면 농장이 커지고, 메뉴는 팝업으로)" },
   { group: "메뉴", keys: ["u"], label: "U", command: "menu:window", text: "메뉴를 새 창으로 (다른 모니터로 옮길 수 있어요)" },

@@ -1,0 +1,12 @@
+{
+  "crafts": [
+    { "id": "tulip_bouquet", "name": { "ko": "튤립 꽃다발", "en": "Tulip Bouquet" }, "kind": "gift", "materials": { "tulip": 3 } },
+    { "id": "cosmos_crown", "name": { "ko": "코스모스 화관", "en": "Cosmos Crown" }, "kind": "gift", "materials": { "cosmos": 3 } },
+    { "id": "lavender_sachet", "name": { "ko": "라벤더 향주머니", "en": "Lavender Sachet" }, "kind": "gift", "materials": { "lavender": 2 } },
+    { "id": "flower_basket", "name": { "ko": "들꽃 바구니", "en": "Wildflower Basket" }, "kind": "gift", "materials": { "tulip": 1, "sunflower": 1, "cosmos": 1, "lavender": 1 } },
+    { "id": "tulip_pot", "name": { "ko": "튤립 화분", "en": "Tulip Pot" }, "kind": "decor", "spot": "potLeft", "materials": { "tulip": 2 } },
+    { "id": "sunflower_pot", "name": { "ko": "해바라기 화분", "en": "Sunflower Pot" }, "kind": "decor", "spot": "potRight", "materials": { "sunflower": 2 } },
+    { "id": "flower_wreath", "name": { "ko": "꽃 리스", "en": "Flower Wreath" }, "kind": "decor", "spot": "door", "materials": { "tulip": 1, "cosmos": 1, "lavender": 1 } },
+    { "id": "lotus_lantern", "name": { "ko": "연꽃 등", "en": "Lotus Lantern" }, "kind": "decor", "spot": "lantern", "glow": true, "materials": { "lotus": 2 } }
+  ]
+}

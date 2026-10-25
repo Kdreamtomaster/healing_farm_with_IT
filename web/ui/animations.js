@@ -46,6 +46,9 @@ const JOBS = {
   harvest: { ms: 450, hitMs: 150, pose: "farmer_work" },
   cook: { ms: 1600, hitMs: 1500, pose: "farmer_work" }, // 화덕 앞에서 보글보글
   eat: { ms: 2600, hitMs: 2500, pose: "farmer_work" }, // 돗자리에 앉아 냠냠
+  craft: { ms: 1400, hitMs: 1300, pose: "farmer_work" }, // 헛간 앞 작업대에서 꽃을 엮어요
+  give: { ms: 2800, hitMs: 2700, pose: "farmer_walk" }, // 선물을 들고 친구를 기다려요
+  receive: { ms: 1800, hitMs: 1700, pose: "farmer_walk" }, // 선물을 받고 기뻐해요
 };
 
 // 칸에서 일할 때 서는 자리 (칸의 왼쪽, 발 위치)
@@ -91,6 +94,7 @@ export function createAnimator(helpers = []) {
         job.arrived = now;
         worker.facing = job.facing ?? 1;
         if (job.emote) worker.emote = { icon: job.emote, until: now + EMOTE_MS };
+        job.onArrive?.(worker, now);
       }
       const t = now - job.arrived;
       const { ms, hitMs } = JOBS[job.kind];
@@ -147,6 +151,36 @@ export function createAnimator(helpers = []) {
     // 화덕에서 요리하기: spot 은 화덕 왼쪽 발 위치(밭 기준 좌표). 다 되면 apply(worker)
     cook(spot, apply) {
       return assign({ at: spot, kind: "cook", emote: "note", apply });
+    },
+
+    // 공방: 헛간 앞(spot)에서 꽃을 엮어 만들어요. 다 되면 apply(worker)
+    craft(spot, apply) {
+      return assign({ at: spot, kind: "craft", emote: "note", apply });
+    },
+
+    // 선물하기: 농부가 먼저 가서 기다리면, 친구가 화면 왼쪽에서 걸어와 선물을 받아요.
+    //   spots: { giver, taker, item } (layout.js 의 giftSpots, 밭 기준 좌표), item: 공방 물건 id
+    //   loved: 좋아하는 꽃이면 친구 머리 위에 ★ (아니면 ♥). 친구가 다 받으면 done()
+    gift(spots, friend, item, loved, done) {
+      const effect = { kind: "gift", item, at: spots.item, taker: null, finished: false, update: () => !effect.finished };
+      const receive = {
+        at: spots.taker,
+        facing: spots.taker.facing,
+        kind: "receive",
+        emote: loved ? "star" : "heart",
+        onArrive: (worker, now) => (effect.shownAt = now),
+        apply: () => {
+          effect.finished = true;
+          done();
+        },
+      };
+      const callTaker = () => {
+        const here = workers.find((w) => w.id === friend.id);
+        if (here) here.queue.push(receive);
+        else callFriend(friend, spots.taker.y, receive);
+      };
+      farmer.queue.push({ at: spots.giver, facing: spots.giver.facing, kind: "give", emote: "note", onArrive: callTaker, apply: () => {} });
+      effects.push(effect);
     },
 
     // 다 같이 나눠 먹기: 농부와 친구들이 돗자리(seats)에 둘러앉아 먹어요. 하던 일이 있으면 마치고 와요.
@@ -354,6 +388,12 @@ function drawJobEffect(ctx, worker, kind, t) {
     const hx = worker.x - 2 + (worker.id.length % 3);
     const hy = worker.y - 18 - k * 6;
     for (const [dx, dy] of [[0, 0], [2, 0], [0, 1], [1, 1], [2, 1], [1, 2]]) dot(ctx, hx + dx, hy + dy, "#f06a8a");
+  } else if (kind === "craft") {
+    // 꽃잎이 팔랑팔랑
+    for (let i = 0; i < 3; i++) {
+      const k = (t / 800 + i / 3) % 1;
+      dot(ctx, worker.x + 6 + i * 3 + Math.sin(t / 200 + i) * 2, worker.y - 12 - k * 6, ["#ef8ab0", "#f4c430", "#9a7ad6"][i]);
+    }
   } else if (kind === "harvest" && t >= JOBS.harvest.hitMs) {
     // 반짝반짝
     const k = (t - JOBS.harvest.hitMs) / 300;
@@ -362,6 +402,14 @@ function drawJobEffect(ctx, worker, kind, t) {
 }
 
 const DRAW = {
+  // 두 사람 사이에 떠오른 선물 (친구가 도착한 뒤부터 둥실둥실)
+  gift(ctx, sprites, effect, now) {
+    if (effect.shownAt === undefined) return;
+    const rise = Math.min(4, (now - effect.shownAt) / 120);
+    const bob = Math.round(Math.sin(now / 250));
+    ctx.drawImage(sprites.craft(effect.item), Math.round(effect.at.x - 8), Math.round(effect.at.y - 16 - rise + bob));
+  },
+
   // 돗자리 가운데 놓인 요리
   feast(ctx, sprites, effect) {
     ctx.drawImage(sprites.dish(effect.dish), Math.round(effect.center.x - 8), Math.round(effect.center.y - 10));

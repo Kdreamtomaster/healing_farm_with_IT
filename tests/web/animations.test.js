@@ -127,3 +127,25 @@ test("나눠 먹기: 농부와 친구 셋이 모두 모여 먹은 뒤에 done �
   run(animator, 9000, 5050);
   assert(animator.workers.length === 1 && !animator.isBusy(), "친구들은 돌아가고 상도 치워요");
 });
+
+test("공방: 헛간 앞에 가서 엮고 다 되면 한 번 알려 준다", () => {
+  const animator = createAnimator(FRIENDS);
+  let made = 0;
+  animator.craft({ x: 170, y: 34 }, () => (made += 1));
+  run(animator, 3500);
+  assert(made === 1, `made ${made}`);
+});
+
+test("선물: 농부가 먼저 가서 기다리면 그 친구만 와서 받고, done 은 한 번", () => {
+  const animator = createAnimator(FRIENDS);
+  const spots = { giver: { x: 40, y: 80, facing: -1 }, taker: { x: 16, y: 80, facing: 1 }, item: { x: 28, y: 66 } };
+  let done = 0;
+  animator.gift(spots, FRIENDS[1], "cosmos_crown", true, () => (done += 1));
+  assert(animator.workers.length === 1, "처음엔 농부만");
+  run(animator, 1100);
+  assert(animator.workers.length === 2 && animator.workers[1].id === FRIENDS[1].id, "농부가 도착하면 그 친구가 와요");
+  run(animator, 4500, 1150);
+  assert(done === 1, `done ${done}번`);
+  run(animator, 9000, 4550);
+  assert(animator.workers.length === 1 && !animator.isBusy(), "친구는 돌아가요");
+});

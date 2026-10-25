@@ -43,7 +43,9 @@ assets/
 │   └── stove_1.png, stove_2.png ← 냄비 올린 화덕 (불꽃 2프레임)
 ├── ui/               ← 도구 막대 아이콘 (돋보기, 물뿌리개, 씨앗 주머니, 바구니, 스프링클러, 물길)
 ├── dishes/           ← 요리 그림 (data/recipes.json 의 id 와 같은 이름)
-│   └── caprese.png, potato_soup.png, … (8가지)
+│   └── caprese.png, potato_soup.png, … (16가지)
+├── crafts/           ← 꽃 공방 물건 (data/crafts.json 의 id 와 같은 이름)
+│   └── tulip_bouquet.png, flower_wreath.png, lotus_lantern.png, … (8가지)
 └── effects/
     └── drop_1.png    ← 목마른 작물 위 물방울
 ```

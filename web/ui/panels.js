@@ -1,10 +1,11 @@
-// 위쪽 상태 줄과 오른쪽 메뉴(탭: 밭 · 창고 · 부엌 · 설정)를 그립니다.
+// 위쪽 상태 줄과 오른쪽 메뉴(탭: 밭 · 창고 · 부엌 · 공방 · 설정)를 그립니다.
 // 버튼을 누르면 actions 의 함수를 부를 뿐, 규칙 계산은 하지 않습니다.
 import { lightAt, partOfDay } from "../decor/daylight.js";
 import { cropColor } from "../decor/palette.js";
 import { formatCalendar, seasonOf } from "../decor/season.js";
 import { PLOT_FOR_TYPE, WATER_RANGE, stageOf } from "../farm/crops.js";
 import { seedId } from "../farm/harvest.js";
+import { craftId, lovesGift } from "../friends/crafts.js";
 import { farmSeed, WEATHER_ICONS, weatherAt } from "../farm/weather.js";
 import { getSoundSettings } from "../sound/engine.js";
 import { itemCount } from "../state.js";
@@ -16,6 +17,7 @@ export const TABS = [
   { id: "plot", icon: "🌱", label: "밭", key: "P" },
   { id: "storage", icon: "📦", label: "창고", key: "I" },
   { id: "kitchen", icon: "🍳", label: "부엌", key: "K" },
+  { id: "workshop", icon: "💐", label: "공방", key: "G" },
   { id: "settings", icon: "⚙️", label: "설정", key: "O" },
 ];
 
@@ -41,7 +43,7 @@ function weatherIcon(weather, gameMinutes) {
 }
 
 export function renderPanel(root, game, data, actions) {
-  const content = { plot: plotTab, storage: storageTab, kitchen: kitchenTab, settings: settingsTab }[game.tab] ?? plotTab;
+  const content = { plot: plotTab, storage: storageTab, kitchen: kitchenTab, workshop: workshopTab, settings: settingsTab }[game.tab] ?? plotTab;
   root.replaceChildren(
     el(
       "nav",
@@ -216,12 +218,14 @@ function storageTab(game, data) {
     .filter((s) => itemCount(state, seedId(s.id)) > 0)
     .map((s) => tile(data.icons.seed(s.id), `${s.name.ko} 씨앗`, itemCount(state, seedId(s.id))));
   const dishes = data.recipes.filter((r) => itemCount(state, `dish_${r.id}`) > 0).map((r) => tile(data.icons.dish(r.id), r.name.ko, itemCount(state, `dish_${r.id}`)));
+  const crafted = (data.crafts ?? []).filter((c) => itemCount(state, craftId(c.id)) > 0).map((c) => tile(data.icons.craft(c.id), c.name.ko, itemCount(state, craftId(c.id))));
   const section = (title, items, empty) => [el("h3", {}, title), items.length ? el("div", { class: "items" }, items) : el("p", { class: "hint" }, empty)];
   return [
     el("h2", {}, "창고"),
     section("🧺 수확물", produce, "아직 수확물이 없어요."),
     section("🌱 씨앗", seeds, "씨앗이 없어요. 수확하면 씨앗도 얻어요."),
     section("🍲 요리", dishes, "요리가 없어요. 부엌에서 만들어 보세요."),
+    section("💐 공방 물건", crafted, "꽃으로 만든 물건이 없어요. 공방에서 만들어 보세요."),
   ];
 }
 
@@ -244,16 +248,7 @@ function kitchenTab(game, data, actions) {
         el(
           "span",
           { class: "needs" },
-          Object.entries(recipe.ingredients).map(([item, need]) => {
-            const species = data.speciesById.get(item);
-            const have = itemCount(state, item);
-            return el(
-              "span",
-              { class: have >= need ? "need ok" : "need" },
-              el("img", { src: data.icons.crop(item, species.colors[0].id), alt: species.name.ko, title: species.name.ko }),
-              `${have}/${need}`,
-            );
-          }),
+          needs(recipe.ingredients, state, data),
         ),
       ),
       el("button", { class: "small", disabled: !ok, onclick: () => actions.cook(recipe.id) }, "요리하기"),
@@ -280,6 +275,76 @@ function kitchenTab(game, data, actions) {
         el("summary", {}, `재료를 모으는 중인 요리 ${waiting.length}가지`),
         waiting.map((recipe) => recipeRow(recipe, false)),
       ),
+  ];
+}
+
+// 재료 그림과 "가진 수/필요한 수" (모자라면 주황 글씨)
+function needs(materials, state, data) {
+  return Object.entries(materials).map(([item, need]) => {
+    const species = data.speciesById.get(item);
+    const have = itemCount(state, item);
+    return el(
+      "span",
+      { class: have >= need ? "need ok" : "need" },
+      el("img", { src: data.icons.crop(item, species.colors[0].id), alt: species.name.ko, title: species.name.ko }),
+      `${have}/${need}`,
+    );
+  });
+}
+
+// ── 공방 탭: 꽃으로 꾸미기 물건과 선물 만들기, 친구에게 선물하기 ──
+function workshopTab(game, data, actions) {
+  const { state } = game;
+  const crafts = data.crafts ?? [];
+  const count = (c) => itemCount(state, craftId(c.id));
+  const canMake = (c) => Object.entries(c.materials).every(([item, need]) => itemCount(state, item) >= need);
+  const gifts = crafts.filter((c) => c.kind === "gift" && count(c) > 0);
+  const decor = crafts.filter((c) => c.kind === "decor" && count(c) > 0);
+  const ready = crafts.filter(canMake);
+  const waiting = crafts.filter((c) => !canMake(c));
+  const kindName = { gift: "선물", decor: "꾸미기" };
+  const craftRow = (craft, ok) =>
+    el(
+      "div",
+      { class: ok ? "recipe-row" : "recipe-row dim" },
+      el("img", { class: "dish-icon", src: data.icons.craft(craft.id), alt: "" }),
+      el("span", { class: "recipe-name" }, `${craft.name.ko} `, el("small", { class: "tag" }, kindName[craft.kind]), el("span", { class: "needs" }, needs(craft.materials, state, data))),
+      el("button", { class: "small", disabled: !ok, onclick: () => actions.craft(craft.id) }, "만들기"),
+    );
+  return [
+    el("h2", {}, "꽃 공방"),
+    el("p", { class: "hint" }, "수확한 꽃으로 마당을 꾸미거나 친구에게 줄 선물을 만들어요."),
+    gifts.length > 0 && el("h3", {}, "🎁 선물하기"),
+    gifts.map((craft) =>
+      el(
+        "div",
+        { class: "recipe-row" },
+        el("img", { class: "dish-icon", src: data.icons.craft(craft.id), alt: "" }),
+        el("span", { class: "recipe-name" }, `${craft.name.ko} × ${count(craft)}`),
+        el(
+          "span",
+          { class: "friend-buttons" },
+          data.friends.map((friend) =>
+            el(
+              "button",
+              { class: "small", title: lovesGift(craft, friend) ? `${friend.name}: 제일 좋아하는 꽃이 들어 있어요` : friend.name, onclick: () => actions.gift(craft.id, friend.id) },
+              lovesGift(craft, friend) ? `★ ${friend.name}` : friend.name,
+            ),
+          ),
+        ),
+      ),
+    ),
+    decor.length > 0 && el("p", { class: "hint" }, `🏡 마당에 놓여 있어요: ${decor.map((c) => c.name.ko).join(", ")}`),
+    el("h3", {}, "✂️ 만들기"),
+    ready.length ? ready.map((craft) => craftRow(craft, true)) : el("p", { class: "hint" }, "꽃이 모자라요. 화단과 논에서 꽃을 키워 보세요."),
+    waiting.length > 0 &&
+      el(
+        "details",
+        { class: "more", open: Boolean(game.ui?.moreCrafts), ontoggle: (e) => actions.remember("moreCrafts", e.target.open) },
+        el("summary", {}, `꽃을 모으는 중인 물건 ${waiting.length}가지`),
+        waiting.map((craft) => craftRow(craft, false)),
+      ),
+    el("p", { class: "hint" }, `좋아하는 꽃: ${data.friends.map((f) => `${f.name} ${data.speciesById.get(f.favoriteFlower)?.name.ko ?? "?"}`).join(" · ")}`),
   ];
 }
 

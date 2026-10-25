@@ -63,6 +63,22 @@ export const EFFECTS = {
     { note: "G5", at: 0.16, len: 0.08 },
     { note: "C6", at: 0.24, len: 0.28 },
   ],
+  // 공방에서 다 만들었을 때: 사각사각 → 반짝
+  craft: [
+    { note: "A5", at: 0, len: 0.05, volume: 0.08 },
+    { note: "B5", at: 0.07, len: 0.05, volume: 0.08 },
+    { note: "A5", at: 0.14, len: 0.05, volume: 0.08 },
+    { note: "E6", at: 0.26, len: 0.12, wave: "triangle", volume: 0.2 },
+    { note: "A6", at: 0.36, len: 0.3, wave: "triangle", volume: 0.18 },
+  ],
+  // 선물을 건넸을 때: 두근두근 올라가는 소리
+  gift: [
+    { note: "C6", at: 0, len: 0.1, wave: "triangle", volume: 0.2 },
+    { note: "E6", at: 0.1, len: 0.1, wave: "triangle", volume: 0.2 },
+    { note: "G6", at: 0.2, len: 0.1, wave: "triangle", volume: 0.2 },
+    { note: "E6", at: 0.32, len: 0.1, wave: "triangle", volume: 0.18 },
+    { note: "C7", at: 0.42, len: 0.4, wave: "triangle", volume: 0.18 },
+  ],
   // 저장: 딩-동
   save: [
     { note: "G5", at: 0, len: 0.14, wave: "triangle", volume: 0.25 },

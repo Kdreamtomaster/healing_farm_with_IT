@@ -23,7 +23,8 @@ export function drawLight(ctx, light) {
 }
 
 // 밤이 되면: 하늘에 별이 반짝, 헛간 창문과 화덕에 따뜻한 불빛
-export function drawNightLights(ctx, layout, light, weather, time) {
+// lights: 꾸미기 물건의 불빛 [{ x, y, r }] (연꽃 등)
+export function drawNightLights(ctx, layout, light, weather, time, lights = []) {
   if (light.darkness < 0.12) return;
   const glow = light.darkness / 0.34; // 0 ~ 1
   // 따뜻한 불빛 둘레
@@ -37,6 +38,11 @@ export function drawNightLights(ctx, layout, light, weather, time) {
   ctx.fillStyle = "#ffd36b";
   ctx.fillRect(window.x + 1, window.y + 1, 2, 2);
   halo(layout.kitchen.x + 8, layout.kitchen.y + 13, 5);
+  for (const lamp of lights) {
+    halo(lamp.x, lamp.y, lamp.r);
+    ctx.fillStyle = "#ffd36b";
+    ctx.fillRect(lamp.x - 1, lamp.y, 2, 2);
+  }
   // 별 (구름 낀 밤에는 숨어요)
   if (weather !== "sunny" && weather !== "rainbow") return;
   const skyHeight = layout.farm.y - 10;

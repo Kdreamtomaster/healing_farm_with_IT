@@ -20,6 +20,7 @@ export function createIcons(sprites, speciesById) {
       return url(`seed:${speciesId}`, () => sprites.scenery("sack_1", hex));
     },
     dish: (recipeId) => `/assets/dishes/${recipeId}.png`,
+    craft: (craftId) => `/assets/crafts/${craftId}.png`,
     tool: (toolId) => `/assets/ui/tool_${toolId}.png`,
     drone: () => "/assets/actors/drone_1.png",
   };

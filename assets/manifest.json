@@ -64,5 +64,15 @@
     "coleslaw",
     "vegetable_stew",
     "black_rice_bowl"
+  ],
+  "crafts": [
+    "tulip_bouquet",
+    "cosmos_crown",
+    "lavender_sachet",
+    "flower_basket",
+    "tulip_pot",
+    "sunflower_pot",
+    "flower_wreath",
+    "lotus_lantern"
   ]
 }

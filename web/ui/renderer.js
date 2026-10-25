@@ -2,9 +2,9 @@
 // 캔버스는 실제 픽셀 크기(칸 하나 16×16)로 그리고, CSS 로 화면에 맞게 확대합니다.
 // (style.css 의 image-rendering: pixelated 덕분에 흐려지지 않아요)
 //
-// 그리는 순서: 배경(풀·나무·헛간) → 창고(상자·자루)·고양이 → 밭과 작물 → 사람·드론
+// 그리는 순서: 배경(풀·나무·헛간) → 창고(상자·자루)·꾸미기 물건·고양이 → 밭과 작물 → 사람·드론
 //   → 계절 색조 → 날씨 색조 → 하루의 빛 → 밤 불빛과 별 → 무지개 → 나비 → 계절 입자 → 비·눈 → 선택 표시
-// scene = { layout, state, speciesList, speciesById, palette, sprites, selectedId, hoverId, preview, animator, cat, time }
+// scene = { layout, state, speciesList, speciesById, crafts, palette, sprites, selectedId, hoverId, preview, animator, cat, time }
 //   time: 애니메이션용 시각(ms). 흔들리는 작물, 계절 효과가 이 값으로 움직여요.
 import { borderColor, cropColor, mixColors } from "../decor/palette.js";
 import { lightAt } from "../decor/daylight.js";
@@ -14,7 +14,8 @@ import { drawButterflies, drawCat } from "./critters.js";
 import { drawLight, drawNightLights, drawPrecipitation, drawRainbow, drawWeatherTint } from "./sky.js";
 import { isThirsty, stageOf } from "../farm/crops.js";
 import { TILE } from "./layout.js";
-import { drawScenery, drawStorage } from "./scenery.js";
+import { decorOnDisplay } from "../friends/crafts.js";
+import { decorLights, drawDecor, drawScenery, drawStorage } from "./scenery.js";
 const SWAY_MS = 700; // 작물이 흔들리는 박자
 const RIPPLE = "#cfeaf2";
 const SELECT = "#fff6c8";
@@ -35,6 +36,8 @@ export function drawFarm(ctx, scene) {
   const light = lightAt(gameMinutes);
   drawScenery(ctx, layout, palette, sprites, look, time);
   drawStorage(ctx, layout, state, scene.speciesList, sprites);
+  const decor = decorOnDisplay(state, scene.crafts ?? []);
+  drawDecor(ctx, layout, decor, sprites);
   if (scene.cat) drawCat(ctx, scene.cat, layout, sprites, light.night, time);
   const beat = Math.floor(time / SWAY_MS);
   ctx.save();
@@ -63,7 +66,7 @@ export function drawFarm(ctx, scene) {
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   drawWeatherTint(ctx, weather);
   drawLight(ctx, light);
-  drawNightLights(ctx, layout, light, weather, time);
+  drawNightLights(ctx, layout, light, weather, time, decorLights(layout, decor));
   if (weather === "rainbow") drawRainbow(ctx, layout);
   const sunnyDay = light.darkness < 0.1 && (weather === "sunny" || weather === "rainbow");
   if (sunnyDay && (season === "spring" || season === "summer")) drawButterflies(ctx, layout, time);

@@ -32,6 +32,7 @@ export function computeLayout(plots, portrait) {
       sacks: { x: yard.x + 10, y: yard.y + 56 }, // 씨앗 자루 줄
       path: { x: farmRight + 3, y: yard.y + 30, w: 10, h: farmBottom - yard.y - 30 },
       trees: [2, 26, 50, 78, 104, 128].map((x, i) => ({ x, y: i % 2 ? 2 : 0 })),
+      decor: decorSpots({ x: yard.x + 24, y: yard.y }, { x: farm.x - 10, y: farmBottom + 4 }, { x: farm.x + farm.w - 30, y: farmBottom + 4 }, { x: yard.x + 6, y: farmBottom + 2 }),
     };
   }
   const yardY = farmBottom + 8;
@@ -48,6 +49,24 @@ export function computeLayout(plots, portrait) {
     sacks: { x: farm.x + 46, y: yardY + 22 },
     path: { x: farm.x + 10, y: farmBottom, w: 12, h: 10 },
     trees: [2, 28, 56, 84, 112, 140].map((x, i) => ({ x, y: i % 2 ? 2 : 0 })),
+    decor: decorSpots({ x: farm.x, y: yardY }, { x: farm.x + 2, y: yardY + 46 }, { x: farm.x + 94, y: yardY + 46 }, { x: farm.x + 114, y: yardY + 44 }),
+  };
+}
+
+// 꾸미기 물건이 놓이는 자리 (16×16 그림의 왼쪽 위). data/crafts.json 의 spot 이름과 짝이에요.
+//   door: 헛간 문에 거는 리스, potLeft·potRight: 화분, lantern: 연꽃 등
+function decorSpots(barn, potLeft, potRight, lantern) {
+  return { door: { x: barn.x + 8, y: barn.y + 16 }, potLeft, potRight, lantern };
+}
+
+// 선물 건네는 자리: 돗자리 왼쪽에서 농부와 친구가 마주 서요 (친구는 화면 왼쪽에서 걸어와요)
+// 선물은 두 사람 머리 위 말풍선 사이에 떠올라요 (item 은 선물 그림의 아래 가운데)
+export function giftSpots(picnic) {
+  const y = picnic.y + picnic.h;
+  return {
+    giver: { x: picnic.x - 2, y, facing: -1 },
+    taker: { x: picnic.x - 26, y, facing: 1 },
+    item: { x: picnic.x - 14, y: y - 14 },
   };
 }
 

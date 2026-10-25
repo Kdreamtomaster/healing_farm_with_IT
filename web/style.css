@@ -301,11 +301,19 @@ button.mini.color::before {
 .tab {
   flex: 1;
   justify-content: center;
-  padding: 6px 4px;
+  padding: 6px 2px;
   background: #e9dcc4;
   color: var(--ink);
   border-color: var(--line);
-  font-size: 14px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* 탭이 다섯 개라 단축키 글자는 작게 */
+.tab kbd {
+  min-width: 0;
+  padding: 0 2px;
+  font-size: 9px;
 }
 
 .tab.active {
@@ -591,6 +599,22 @@ button.swatch:disabled {
   font-size: 12px;
 }
 
+.recipe-name small.tag {
+  display: inline-block;
+  padding: 0 4px;
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.friend-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  justify-content: flex-end;
+  max-width: 50%;
+}
+
 .needs {
   display: flex;
   flex-wrap: wrap;
@@ -641,6 +665,10 @@ button.swatch:disabled {
   max-height: none;
   overflow-y: auto;
   flex: 1;
+}
+
+#float-menu .tabs {
+  margin-right: 16px; /* 닫기 버튼과 겹치지 않게 */
 }
 
 #float-menu .close {
@@ -843,7 +871,8 @@ body.idle-mode #float-menu {
     width: 100%;
     font-size: 13px;
   }
-  header kbd {
+  header kbd,
+  .tab kbd {
     display: none;
   }
   main {

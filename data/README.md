@@ -20,8 +20,8 @@
 | `start.json` | 새 농장: 구획 배치, 처음 씨앗, 시간 배율 | ✔ |
 | `recipes.json` | 요리: 이름, 재료와 개수 (`"ingredients": { "potato": 2, "tomato": 1 }`) | ✔ |
 | `unlocks.json` | 해금 조건: 직접 플레이 시간, 수확 횟수 | 예정 |
-| `gifts.json` | 선물 레시피: 재료 → 선물, 등급 확률 | 예정 |
-| `friends.json` | 친구: 이름, 맡은 구획(`plots`), 옷 색(`shirt`), 제일 좋아하는 요리(`favoriteDish`) ✔ / 반응 대사는 5단계 | 일부 |
+| `crafts.json` | 꽃 공방: 꽃 → 꾸미기 물건(`kind: decor`, 놓일 자리 `spot`, 밤에 빛나면 `glow`) / 선물(`kind: gift`) | ✔ (등급 확률은 예정) |
+| `friends.json` | 친구: 이름, 맡은 구획(`plots`), 옷 색(`shirt`), 제일 좋아하는 요리(`favoriteDish`)·꽃(`favoriteFlower`) ✔ / 반응 대사는 5단계 | 일부 |
 | `lines.json` | 로딩 화면 안내 멘트 문장틀 | 예정 |
 
 ### 작물 데이터 (`crops.json`)

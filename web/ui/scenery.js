@@ -69,6 +69,19 @@ function drawFruit(ctx, x, y, hex) {
   ctx.fillRect(x, y, 1, 1);
 }
 
+// 꾸미기 물건: 공방에서 만든 화분·리스·등이 마당의 정해진 자리(layout.decor[spot])에 놓여요
+export function drawDecor(ctx, layout, decor, sprites) {
+  for (const craft of decor) {
+    const spot = layout.decor[craft.spot];
+    if (spot) ctx.drawImage(sprites.craft(craft.id), spot.x, spot.y);
+  }
+}
+
+// 밤에 빛나는 꾸미기 물건(glow)의 불빛 자리
+export function decorLights(layout, decor) {
+  return decor.filter((c) => c.glow && layout.decor[c.spot]).map((c) => ({ x: layout.decor[c.spot].x + 8, y: layout.decor[c.spot].y + 7, r: 5 }));
+}
+
 // 창고 마당에 놓을 자리는 상자 4개·자루 4묶음뿐이라, 가장 많이 쌓인 작물부터 골라요.
 // 고른 작물은 data/crops.json 순서대로 놓아서, 개수가 조금 바뀌어도 자리가 자꾸 뒤바뀌지 않아요.
 export const STORAGE_SLOTS = 4;

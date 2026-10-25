@@ -1,6 +1,6 @@
 // 게임 시작점: 데이터와 세이브를 불러와 비운 시간을 처리하고, 1초마다 농장의 시간을 흘려보냅니다.
 // 마우스·키보드 조작, 도구, 메뉴(옆에 붙이기 · 팝업 · 새 창)도 여기서 이어 줘요.
-import { loadFriends, loadManifest, loadPalette, loadRecipes, loadSpecies, loadState, saveState } from "./api.js";
+import { loadCrafts, loadFriends, loadManifest, loadPalette, loadRecipes, loadSpecies, loadState, saveState } from "./api.js";
 import { isRestTime, lightAt } from "./decor/daylight.js";
 import { applyBorderToKind, setBorder } from "./decor/plots-style.js";
 import { seasonOf } from "./decor/season.js";
@@ -12,6 +12,7 @@ import { harvest, plant } from "./farm/harvest.js";
 import { cycleColor, cycleSeed, seedFor, smartTask, toolTask } from "./farm/tools.js";
 import { farmSeed, weatherAt } from "./farm/weather.js";
 import { fansOf, finishCooking, share, shareMessage, startCooking } from "./friends/cooking.js";
+import { finishCraft, giveGift, startCraft } from "./friends/crafts.js";
 import { playSound, setNatureEnv, setSound, unlockAudio } from "./sound/engine.js";
 import { josa, PLOT_NAMES } from "./text.js";
 import { startAutosave } from "./time/autosave.js";
@@ -24,7 +25,7 @@ import { el } from "./ui/dom.js";
 import { renderHelp } from "./ui/help.js";
 import { createIcons, toolCursor } from "./ui/icons.js";
 import { commandForKey, MOVES, moveCursor } from "./ui/keys.js";
-import { computeLayout, fitZoom, picnicSeats } from "./ui/layout.js";
+import { computeLayout, fitZoom, giftSpots, picnicSeats } from "./ui/layout.js";
 import { hideLoading, showProgress, showSummary } from "./ui/loading.js";
 import { plotSummary, renderHeader, renderPanel } from "./ui/panels.js";
 import { drawFarm, plotAt } from "./ui/renderer.js";
@@ -46,10 +47,11 @@ const toolbar = document.getElementById("toolbar");
 const floatMenu = document.getElementById("float-menu");
 const helpBox = document.getElementById("help");
 
-const [speciesList, friends, recipes, palette, manifest, boot] = await Promise.all([
+const [speciesList, friends, recipes, crafts, palette, manifest, boot] = await Promise.all([
   loadSpecies(),
   loadFriends(),
   loadRecipes(),
+  loadCrafts(),
   loadPalette(),
   loadManifest(),
   loadState(),
@@ -57,8 +59,9 @@ const [speciesList, friends, recipes, palette, manifest, boot] = await Promise.a
 const sprites = await loadSprites(manifest);
 const speciesById = new Map(speciesList.map((s) => [s.id, s]));
 const icons = createIcons(sprites, speciesById);
-const data = { speciesList, speciesById, palette, recipes, friends, icons };
+const data = { speciesList, speciesById, palette, recipes, crafts, friends, icons };
 let feasting = false; // 나눠 먹는 중에는 또 상을 차리지 않아요
+let gifting = false; // 선물을 건네는 중에는 다음 선물을 기다려요
 const animator = createAnimator(friends); // 농부(바쁘면 친구들이 도우러 와요), 드론, 스프링클러, 물길 연출
 const cat = createCat(); // 헛간 옆 고양이
 data.isPending = (plotId) => animator.isPending(plotId);
@@ -400,6 +403,37 @@ const actions = {
       fans,
     );
     if (!quiet) showToast("다들 모여라~ 맛있는 거 먹자!");
+    draw();
+  },
+  // 꽃 공방: 꽃을 꺼내 두고, 농부가 헛간 앞에서 엮어 만들면 창고로 (꾸미기 물건은 마당에 저절로 놓여요)
+  craft(id) {
+    const craft = crafts.find((c) => c.id === id);
+    const started = startCraft(game.state, craft);
+    if (!started.ok) return report(started, "craft", craft.id);
+    const spot = { x: layout.barn.x + 4 - layout.farm.x, y: layout.barn.y + 34 - layout.farm.y };
+    animator.craft(spot, (worker) => {
+      const result = finishCraft(game.state, craft);
+      const who = worker.name ? `${josa(worker.name, "이가", "가")} ` : "";
+      report({ ...result, message: `${who}${result.message}` }, "craft", craft.id, "craft", worker.name ?? "player");
+    });
+    showToast(started.message);
+    draw();
+  },
+  // 선물하기: 농부가 돗자리 옆에서 기다리면 친구가 와서 받아요. 좋아하는 꽃이 들어 있으면 ★
+  gift(id, friendId) {
+    if (gifting) return report({ ok: false, message: "지금 선물을 건네는 중이에요. 조금만 기다려 주세요" });
+    const craft = crafts.find((c) => c.id === id);
+    const friend = friends.find((f) => f.id === friendId);
+    const result = giveGift(game.state, craft, friend);
+    if (!result.ok) return report(result, "gift", craft.id);
+    gifting = true;
+    const spots = giftSpots(layout.picnic);
+    const rel = (p) => ({ ...p, x: p.x - layout.farm.x, y: p.y - layout.farm.y });
+    animator.gift({ giver: rel(spots.giver), taker: rel(spots.taker), item: rel(spots.item) }, friend, craft.id, result.loved, () => {
+      gifting = false;
+      report(result, "gift", `${craft.id}:${friend.id}`, "gift");
+    });
+    showToast(`${josa(friend.name, "이를", "를")} 불렀어요. ${josa(craft.name.ko, "을", "를")} 들고 기다려요`);
     draw();
   },
   setTimeScale(scale) {

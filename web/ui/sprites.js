@@ -26,6 +26,7 @@ export async function loadSprites(manifest) {
   }
   for (const name of manifest.scenery) entries.push([name, `scenery/${name}.png`]);
   for (const name of manifest.dishes) entries.push([`dish_${name}`, `dishes/${name}.png`]);
+  for (const name of manifest.crafts) entries.push([`craft_${name}`, `crafts/${name}.png`]);
   const images = Object.fromEntries(await Promise.all(entries.map(async ([key, src]) => [key, await loadImage(src)])));
   const drop = await loadImage(manifest.effects.drop);
   const marker = (name) => hexToRgb(manifest.recolor[name]);
@@ -46,6 +47,10 @@ export async function loadSprites(manifest) {
     // 요리 그림 (data/recipes.json 의 id)
     dish(name) {
       return images[`dish_${name}`];
+    },
+    // 공방 물건 그림 (data/crafts.json 의 id)
+    craft(name) {
+      return images[`craft_${name}`];
     },
     // 배경 그림. hex 를 주면 표시색 자리를 그 색으로 (계절 나뭇잎, 씨앗 자루 띠)
     scenery(name, hex) {
