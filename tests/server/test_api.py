@@ -1,8 +1,12 @@
 """서버 주소 처리, 입력 검증, 요청 출처 확인 테스트."""
 
+import contextlib
 import http.client
+import io
 import json
+import socket
 import threading
+import time
 import unittest
 
 from helpers import ROOT, TempFarm, rules, save_request
@@ -125,6 +129,34 @@ class ServerTest(unittest.TestCase):
     def test_rejects_wrong_host(self):
         status, _ = self.request("GET", "/api/state", headers={"Host": "evil.example"})
         self.assertEqual(status, 403)
+
+    def test_client_leaving_early_does_not_print_traceback(self):
+        """저장 요청만 보내고 답장을 기다리지 않고 떠나는 브라우저 (창 닫기, 새로고침)"""
+        status, data = self.request("GET", "/api/state")
+        body = json.dumps(save_request(json.loads(data)["state"])).encode()
+        errors = io.StringIO()
+        with contextlib.redirect_stderr(errors):
+            raw = socket.create_connection(("127.0.0.1", self.port))
+            raw.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, b"\x01\x00\x00\x00\x00\x00\x00\x00")  # 끊을 때 RST
+            raw.sendall(
+                f"POST /api/save HTTP/1.1\r\nHost: 127.0.0.1:{self.port}\r\nContent-Type: application/json\r\n"
+                f"Content-Length: {len(body)}\r\n\r\n".encode() + body
+            )
+            raw.close()
+            time.sleep(0.5)
+        self.assertNotIn("Traceback", errors.getvalue())
+        _, data = self.request("GET", "/api/state")
+        self.assertEqual(json.loads(data)["integrity"], "ok")  # 저장은 정상
+
+    def test_connection_errors_are_quiet_but_other_errors_are_shown(self):
+        for error, shown in ((ConnectionAbortedError(), False), (BrokenPipeError(), False), (ValueError("bug"), True)):
+            errors = io.StringIO()
+            with contextlib.redirect_stderr(errors):
+                try:
+                    raise error
+                except Exception:
+                    self.server.handle_error(None, ("127.0.0.1", 0))
+            self.assertEqual("Traceback" in errors.getvalue(), shown, type(error).__name__)
 
     def test_bad_save_is_400(self):
         status, _ = self.request("POST", "/api/save", "not json")

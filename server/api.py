@@ -125,6 +125,17 @@ class FarmServer(ThreadingHTTPServer):
     # Windows 에서는 이 옵션이 켜져 있으면 이미 쓰는 포트에 또 붙어 버려서 끕니다.
     allow_reuse_address = sys.platform != "win32"
 
+    def handle_error(self, request, client_address):
+        """답장을 보내기 전에 브라우저가 연결을 끊은 경우는 조용히 넘어가요.
+
+        창을 닫거나 새로고침하면서 보낸 저장 요청은 저장은 다 끝났는데, 브라우저가 이미 떠나서
+        "저장했어요" 답장만 못 받는 일이 흔해요. Windows 에서는 이때 ConnectionAbortedError 가 나요.
+        그 밖의 오류는 원래대로 자세히 보여 줍니다.
+        """
+        if isinstance(sys.exc_info()[1], ConnectionError):
+            return
+        super().handle_error(request, client_address)
+
 
 def _now() -> int:
     return int(time.time() * 1000)
