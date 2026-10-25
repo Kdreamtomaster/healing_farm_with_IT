@@ -30,6 +30,8 @@ assets/
 ├── actors/           ← 등장인물 (색을 바꾸지 않고 그대로 그림)
 │   ├── farmer_walk_1.png, farmer_walk_2.png   ← 걷는 농부 (오른쪽을 봄, 왼쪽은 뒤집어 그림)
 │   ├── farmer_pour_1.png, farmer_pour_2.png   ← 물뿌리개 기울이기
+│   ├── farmer_work_1.png, farmer_work_2.png   ← 쪼그려 심기·수확
+│   │     (옷 색 #6fb0dc 는 도와주러 온 친구의 옷 색으로 바꿔 그림)
 │   └── drone_1.png, drone_2.png               ← 프로펠러가 도는 드론
 └── effects/
     └── drop_1.png    ← 목마른 작물 위 물방울

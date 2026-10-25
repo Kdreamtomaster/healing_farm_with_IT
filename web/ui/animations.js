@@ -1,4 +1,5 @@
-// 물주기 연출: 농부가 걸어가서 물뿌리개로, 드론이 날아다니며, 스프링클러가 돌며, 논에 물이 흘러들며.
+// 농사 연출: 농부가 걸어가서 심고·물주고·수확하고(바쁘면 친구들이 도우러 와요),
+// 일괄 물주기는 드론이 날아다니며, 스프링클러가 돌며, 논에 물이 흘러들며.
 //
 // 연출은 "보여 주기"만 맡고, 실제 물주기는 규칙 함수(farm/care.js)를 apply(plot) 로 넘겨받아
 // 연출이 그 칸에 닿는 순간에 실행합니다. 그래서 흙이 젖는 순간과 그림이 딱 맞아요.
@@ -9,7 +10,6 @@ import { TILE } from "./renderer.js";
 const FARMER_SPEED = 6 * TILE; // 1초에 6칸 (px/s)
 const MAX_WALK_MS = 1000; // 아무리 멀어도 1초 안에 도착 — 기다리게 하지 않아요
 const POUR_MS = 600; // 물뿌리개를 기울이는 시간
-const POUR_HIT_MS = 200; // 기울이기 시작하고 이만큼 뒤에 흙이 젖어요
 const DRONE_SPEED = 8 * TILE;
 const DRONE_HOVER_MS = 250; // 칸 위에 머물며 물을 뿌리는 시간
 const SPRINKLER_MS = 1400;
@@ -37,39 +37,99 @@ export function visitOrder(start, plots) {
   return order;
 }
 
-export function createAnimator() {
-  // 농부는 물주기 부탁을 줄 세워 하나씩 처리해요. (x, y 는 발 위치)
-  const farmer = { x: 6, y: 14, facing: 1, queue: [], job: null };
-  const effects = [];
+// 사람이 하는 일: 걸어가서 → 일하고(이때 hit 시각에 규칙이 실행돼요) → 끝
+const JOBS = {
+  water: { ms: 600, hitMs: 200, pose: "farmer_pour" },
+  flood: { ms: 600, hitMs: 200, pose: "farmer_pour" },
+  plant: { ms: 450, hitMs: 200, pose: "farmer_work" },
+  harvest: { ms: 450, hitMs: 150, pose: "farmer_work" },
+};
+const MAX_WORKERS = 4; // 농부 + 도와주러 오는 친구 최대 3명
+const EXIT_X = -12; // 친구들은 왼쪽 밖에서 들어오고 나가요
 
-  function updateFarmer(now) {
-    if (!farmer.job && farmer.queue.length) {
-      const { plot, apply } = farmer.queue.shift();
-      const to = { x: plot.x * TILE + 3, y: plot.y * TILE + 14 }; // 칸의 왼쪽에 서서 오른쪽을 보고 물을 줘요
-      const walkMs = Math.min(MAX_WALK_MS, travelMs(farmer, to, FARMER_SPEED));
-      farmer.facing = to.x >= farmer.x ? 1 : -1;
-      farmer.job = { plot, apply, from: { x: farmer.x, y: farmer.y }, to, start: now, walkMs, poured: false };
+// helpers: 바쁠 때 도와주러 오는 친구들 [{ id, name, shirt }] (data/friends.json)
+export function createAnimator(helpers = []) {
+  const farmer = { id: "farmer", name: null, shirt: null, x: 6, y: 14, facing: 1, queue: [], job: null, walk: null };
+  const workers = [farmer];
+  const effects = [];
+  const isIdle = (w) => !w.job && !w.queue.length;
+
+  function walkTo(worker, to, now) {
+    worker.walk = { from: { x: worker.x, y: worker.y }, to, start: now, ms: Math.min(MAX_WALK_MS, travelMs(worker, to, FARMER_SPEED)) };
+    worker.facing = to.x >= worker.x ? 1 : -1;
+  }
+
+  // 걸음을 한 번 옮기고, 도착했으면 true
+  function step(worker, now) {
+    const walk = worker.walk;
+    const k = walk.ms ? clamp01((now - walk.start) / walk.ms) : 1;
+    worker.x = lerp(walk.from.x, walk.to.x, k);
+    worker.y = lerp(walk.from.y, walk.to.y, k);
+    return k >= 1;
+  }
+
+  function updateWorker(worker, now) {
+    if (!worker.job && worker.queue.length) {
+      const job = worker.queue.shift();
+      worker.job = { ...job, arrived: null, hit: false };
+      worker.leaving = false;
+      walkTo(worker, { x: job.plot.x * TILE + 3, y: job.plot.y * TILE + 14 }, now); // 칸의 왼쪽에 서서 일해요
     }
-    const job = farmer.job;
-    if (!job) return;
-    const t = now - job.start;
-    const walk = job.walkMs ? clamp01(t / job.walkMs) : 1;
-    farmer.x = lerp(job.from.x, job.to.x, walk);
-    farmer.y = lerp(job.from.y, job.to.y, walk);
-    if (walk >= 1) farmer.facing = 1;
-    if (!job.poured && t >= job.walkMs + POUR_HIT_MS) {
-      job.poured = true;
-      job.apply(job.plot);
+    const job = worker.job;
+    if (job) {
+      if (job.arrived === null) {
+        if (!step(worker, now)) return;
+        job.arrived = now;
+        worker.facing = 1;
+      }
+      const t = now - job.arrived;
+      const { ms, hitMs } = JOBS[job.kind];
+      if (!job.hit && t >= hitMs) {
+        job.hit = true;
+        job.apply(job.plot, worker);
+      }
+      if (t >= ms) worker.job = null;
+      return;
     }
-    if (t >= job.walkMs + POUR_MS) farmer.job = null;
+    // 일을 다 마친 친구는 왔던 쪽으로 돌아가요
+    if (worker !== farmer) {
+      if (!worker.leaving) {
+        worker.leaving = true;
+        walkTo(worker, { x: EXIT_X, y: worker.y }, now);
+      }
+      if (step(worker, now)) workers.splice(workers.indexOf(worker), 1);
+    }
   }
 
   return {
-    farmer,
+    workers,
 
-    // 농부에게 물주기 부탁 (apply: 실제로 물을 주는 함수)
-    farmerWater(plot, apply) {
-      farmer.queue.push({ plot, apply });
+    // 일 맡기기: 쉬는 사람 → 새 친구 부르기 → 그래도 없으면 할 일이 가장 적은 사람 순서로
+    //   kind: "water" | "flood" | "plant" | "harvest"
+    //   apply(plot, worker): 그 칸에서 실제로 일을 하는 함수 (worker.name 이 있으면 친구가 한 일)
+    work(plot, kind, apply, now) {
+      const job = { plot, kind, apply };
+      const target = { x: plot.x * TILE + 3, y: plot.y * TILE + 14 };
+      const idle = workers.filter(isIdle).sort((a, b) => distance(a, target) - distance(b, target))[0];
+      if (idle) {
+        idle.queue.push(job);
+        return idle;
+      }
+      const friend = helpers.find((h) => !workers.some((w) => w.id === h.id));
+      if (friend && workers.length < MAX_WORKERS) {
+        const helper = { ...friend, x: EXIT_X, y: target.y, facing: 1, queue: [job], job: null, walk: null, leaving: false };
+        workers.push(helper);
+        return helper;
+      }
+      const load = (w) => w.queue.length + (w.job ? 1 : 0);
+      const least = [...workers].sort((a, b) => load(a) - load(b))[0];
+      least.queue.push(job);
+      return least;
+    },
+
+    // 이 칸에 누가 일하러 가는 중인지 (같은 일을 두 번 맡기지 않도록)
+    isPending(plotId) {
+      return workers.some((w) => w.job?.plot.id === plotId || w.queue.some((j) => j.plot.id === plotId));
     },
 
     // 드론: 가까운 칸부터 들러 물을 뿌리고 날아가요. 다 끝나면 done()
@@ -158,19 +218,20 @@ export function createAnimator() {
     },
 
     update(now) {
-      updateFarmer(now);
+      for (const worker of [...workers]) updateWorker(worker, now);
       for (let i = effects.length - 1; i >= 0; i--) {
         if (!effects[i].update(now)) effects.splice(i, 1);
       }
     },
 
     isBusy() {
-      return Boolean(farmer.job || farmer.queue.length || effects.length);
+      return workers.length > 1 || !isIdle(farmer) || effects.length > 0;
     },
 
     draw(ctx, sprites, now) {
       for (const effect of effects) DRAW[effect.kind](ctx, sprites, effect, now);
-      drawFarmer(ctx, sprites, farmer, now);
+      // 아래쪽(화면 앞)에 있는 사람을 나중에 그려야 겹칠 때 자연스러워요
+      for (const worker of [...workers].sort((a, b) => a.y - b.y)) drawWorker(ctx, sprites, worker, now);
     },
   };
 }
@@ -193,23 +254,40 @@ function drawFacing(ctx, image, x, y, facing) {
   ctx.restore();
 }
 
-function drawFarmer(ctx, sprites, farmer, now) {
-  const job = farmer.job;
-  const pouring = job && now - job.start >= job.walkMs;
-  let image;
-  if (pouring) {
-    const t = now - job.start - job.walkMs;
-    image = sprites.actor("farmer_pour", Math.floor(t / 150));
+function drawWorker(ctx, sprites, worker, now) {
+  const job = worker.job;
+  const working = job && job.arrived !== null;
+  const walking = (job && !working) || worker.leaving;
+  let pose = "farmer_walk";
+  let frame = walking ? Math.floor(now / 160) : 0;
+  if (working) {
+    const t = now - job.arrived;
+    pose = JOBS[job.kind].pose;
+    frame = Math.floor(t / 150);
+    drawJobEffect(ctx, worker, job.kind, t);
+  }
+  const bob = !job && !worker.leaving && Math.floor(now / 600) % 2 ? 1 : 0; // 가만히 있을 때 숨쉬듯 들썩
+  drawFacing(ctx, sprites.actor(pose, frame, worker.shirt), worker.x - 8, worker.y - 15 + bob, worker.facing);
+}
+
+function drawJobEffect(ctx, worker, kind, t) {
+  const sx = worker.x + 9;
+  const sy = worker.y - 6;
+  if (kind === "water" || kind === "flood") {
     // 물뿌리개 끝에서 작물 쪽으로 떨어지는 물방울
     for (let i = 0; i < 4; i++) {
       const k = ((t / POUR_MS) * 3 + i / 4) % 1;
-      dot(ctx, farmer.x + 9 + k * 6, farmer.y - 4 + k * k * 8, i % 2 ? WATER : WATER_DARK);
+      dot(ctx, worker.x + 9 + k * 6, worker.y - 4 + k * k * 8, i % 2 ? WATER : WATER_DARK);
     }
-  } else {
-    image = sprites.actor("farmer_walk", job ? Math.floor(now / 160) : 0);
+  } else if (kind === "plant" && t >= JOBS.plant.hitMs) {
+    // 흙이 톡톡 튀어요
+    const k = (t - JOBS.plant.hitMs) / 250;
+    if (k < 1) for (const dx of [-2, 0, 2]) dot(ctx, sx + 1 + dx * (1 + k), sy + 6 - Math.sin(k * Math.PI) * 3, "#6b4a2b");
+  } else if (kind === "harvest" && t >= JOBS.harvest.hitMs) {
+    // 반짝반짝
+    const k = (t - JOBS.harvest.hitMs) / 300;
+    if (k < 1) for (const [dx, dy] of [[0, -4], [4, 0], [-3, 2], [3, -6]]) dot(ctx, sx + 2 + dx * (1 + k), sy + dy - k * 3, "#fff3a0");
   }
-  const bob = !job && Math.floor(now / 600) % 2 ? 1 : 0; // 가만히 있을 때 숨쉬듯 들썩
-  drawFacing(ctx, image, farmer.x - 8, farmer.y - 15 + bob, farmer.facing);
 }
 
 const DRAW = {

@@ -26,39 +26,43 @@ export async function loadSprites(manifest) {
   }
   const images = Object.fromEntries(await Promise.all(entries.map(async ([key, src]) => [key, await loadImage(src)])));
   const drop = await loadImage(manifest.effects.drop);
-  const markers = { main: hexToRgb(manifest.recolor.main), shade: hexToRgb(manifest.recolor.shade) };
+  const marker = (name) => hexToRgb(manifest.recolor[name]);
   const cache = new Map();
+  const cached = (key, make) => {
+    if (!cache.has(key)) cache.set(key, make());
+    return cache.get(key);
+  };
 
   return {
     drop,
-    // 농부·드론 같은 등장인물. 색을 바꾸지 않고 그대로 그려요.
-    actor(name, frame) {
-      return images[`${name}_${(frame % manifest.actors[name]) + 1}`];
+    // 농부·드론 같은 등장인물. shirt 를 주면 옷 색만 바꿔 그려요 (도와주러 온 친구들)
+    actor(name, frame, shirt) {
+      const key = `${name}_${(frame % manifest.actors[name]) + 1}`;
+      if (!shirt) return images[key];
+      return cached(`${key}|${shirt}`, () => recolor(images[key], [[marker("shirt"), hexToRgb(shirt)]]));
     },
     // frame 은 0, 1, 2 … 아무 숫자나 넣으면 그 단계의 그림 수에 맞춰 돌아가요.
     crop(id, stage, frame, hex) {
       const key = `${id}_${stage}_${(frame % frames[stage]) + 1}`;
-      const cacheKey = `${key}|${hex}`;
-      if (!cache.has(cacheKey)) cache.set(cacheKey, recolor(images[key], markers, hex));
-      return cache.get(cacheKey);
+      const main = hexToRgb(hex);
+      const shade = main.map((v) => Math.round(v * 0.72)); // 그림자 쪽은 조금 어둡게
+      return cached(`${key}|${hex}`, () => recolor(images[key], [[marker("main"), main], [marker("shade"), shade]]));
     },
   };
 }
 
-function recolor(image, markers, hex) {
+// swaps: [[바꿀 색, 새 색], ...] (색은 [r, g, b])
+export function recolor(image, swaps) {
   const canvas = document.createElement("canvas");
   canvas.width = image.width;
   canvas.height = image.height;
   const ctx = canvas.getContext("2d");
   ctx.drawImage(image, 0, 0);
   const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const main = hexToRgb(hex);
-  const shade = main.map((v) => Math.round(v * 0.72)); // 그림자 쪽은 조금 어둡게
   const d = pixels.data;
   for (let i = 0; i < d.length; i += 4) {
-    const same = (rgb) => d[i] === rgb[0] && d[i + 1] === rgb[1] && d[i + 2] === rgb[2];
-    const to = same(markers.main) ? main : same(markers.shade) ? shade : null;
-    if (to) [d[i], d[i + 1], d[i + 2]] = to;
+    const swap = swaps.find(([from]) => d[i] === from[0] && d[i + 1] === from[1] && d[i + 2] === from[2]);
+    if (swap) [d[i], d[i + 1], d[i + 2]] = swap[1];
   }
   ctx.putImageData(pixels, 0, 0);
   return canvas;

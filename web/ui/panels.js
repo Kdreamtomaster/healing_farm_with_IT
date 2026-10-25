@@ -52,6 +52,9 @@ function swatch(hex, label, { selected = false, ...props }) {
 function plotInfo(plot, state, data, actions) {
   if (!plot) return el("p", { class: "hint" }, "농장의 칸을 눌러 보세요.");
   const title = el("p", { class: "plot-title" }, `${plot.id + 1}번 칸 · ${PLOT_NAMES[plot.kind]}`);
+  if (data.isPending?.(plot.id)) {
+    return el("div", {}, title, el("p", { class: "hint" }, "일하러 가는 중이에요… 다른 칸을 골라 계속 일을 맡길 수 있어요."));
+  }
   if (!plot.crop) {
     const seeds = data.speciesList.filter((s) => PLOT_FOR_TYPE[s.type] === plot.kind);
     return el(

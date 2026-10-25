@@ -5,7 +5,7 @@ import { BULK, bulkTargets, flood, water } from "./farm/care.js";
 import { advanceFarm } from "./farm/crops.js";
 import { harvest, plant } from "./farm/harvest.js";
 import { playSound, setSound, unlockAudio } from "./sound/engine.js";
-import { PLOT_NAMES } from "./text.js";
+import { josa, PLOT_NAMES } from "./text.js";
 import { startAutosave } from "./time/autosave.js";
 import { MINUTES_PER_DAY, realMsToGameMinutes } from "./time/clock.js";
 import { newReport, planOffline, simulateOffline } from "./time/offline.js";
@@ -38,7 +38,8 @@ const [speciesList, friends, palette, manifest, boot] = await Promise.all([
 const sprites = await loadSprites(manifest);
 const speciesById = new Map(speciesList.map((s) => [s.id, s]));
 const data = { speciesList, speciesById, palette };
-const animator = createAnimator(); // 농부, 드론, 스프링클러, 물길 연출
+const animator = createAnimator(friends); // 농부(바쁘면 친구들이 도우러 와요), 드론, 스프링클러, 물길 연출
+data.isPending = (plotId) => animator.isPending(plotId);
 
 const game = {
   state: boot.state,
@@ -66,43 +67,50 @@ function record(action, detail = "", actor = "player") {
 }
 
 // 규칙 함수의 결과({ ok, message })를 알림으로 보여 주고, 성공했으면 기록하고 효과음을 냅니다.
-function report(result, action, detail, sound) {
+function report(result, action, detail, sound, actor = "player") {
   showToast(result.message);
   if (result.ok) {
-    record(action, detail);
+    record(action, detail, actor);
     if (sound) playSound(sound);
   }
   draw();
 }
 
+// 선택한 칸에 사람을 보내 일을 맡겨요. 도착해서 rule(plot) 으로 실제 일을 하고 결과를 알려 줘요.
+// 농부가 바쁘면 친구가 도우러 오고, 친구가 한 일은 친구 이름으로 알리고 기록해요.
+function sendWorker(kind, rule, sound) {
+  const plot = selectedPlot();
+  if (animator.isPending(plot.id)) return report({ ok: false, message: "이 칸에는 벌써 일하러 가고 있어요" });
+  animator.work(
+    plot,
+    kind,
+    (p, worker) => {
+      const result = rule(p);
+      const message = worker.name && result.ok ? `${josa(worker.name, "이가", "가")} 도와줬어요. ${result.message}` : result.message;
+      report({ ...result, message }, kind, `${p.id}`, sound, worker.name ?? "player");
+    },
+    performance.now(),
+  );
+  draw();
+}
+
 const actions = {
   plant(speciesId, colorId) {
-    const plot = selectedPlot();
     game.preview = null;
-    report(plant(game.state, plot, speciesById.get(speciesId), colorId), "plant", `${plot.id}:${speciesId}:${colorId}`, "plant");
+    sendWorker("plant", (p) => plant(game.state, p, speciesById.get(speciesId), colorId), "plant");
   },
   preview(speciesId, colorId) {
     game.preview = speciesId ? { plotId: game.selectedId, speciesId, colorId } : null;
   },
-  // 농부가 걸어가서 물을 줘요. 흙이 젖는 건 물뿌리개를 기울이는 순간이에요.
+  // 흙이 젖는 건 물뿌리개를 기울이는 순간이에요
   water() {
-    const plot = selectedPlot();
-    if (!plot.crop) return report({ ok: false, message: "물을 줄 작물이 없어요" });
-    animator.farmerWater(plot, (p) =>
-      report(water(p) ? { ok: true, message: "물을 줬어요" } : { ok: false, message: "물을 줄 작물이 없어요" }, "water", `${p.id}`, "water"),
-    );
+    sendWorker("water", (p) => (water(p) ? { ok: true, message: "물을 줬어요" } : { ok: false, message: "물을 줄 작물이 없어요" }), "water");
   },
   flood() {
-    const plot = selectedPlot();
-    if (!plot.crop) return report({ ok: false, message: "물을 댈 수 없어요" });
-    animator.farmerWater(plot, (p) =>
-      report(flood(p) ? { ok: true, message: "논에 물을 가득 채웠어요" } : { ok: false, message: "물을 댈 수 없어요" }, "flood", `${p.id}`, "water"),
-    );
+    sendWorker("flood", (p) => (flood(p) ? { ok: true, message: "논에 물을 가득 채웠어요" } : { ok: false, message: "물을 댈 수 없어요" }), "water");
   },
   harvest() {
-    const plot = selectedPlot();
-    const species = speciesById.get(plot.crop.species);
-    report(harvest(game.state, plot, species), "harvest", `${plot.id}:${species.id}`, "harvest");
+    sendWorker("harvest", (p) => (p.crop ? harvest(game.state, p, speciesById.get(p.crop.species)) : { ok: false, message: "수확할 작물이 없어요" }), "harvest");
   },
   // 일괄 관리는 기계가 도와줘요: 목마른 작물은 드론, 물 많이 먹는 작물은 스프링클러, 논은 물길
   bulk(kind) {
@@ -229,6 +237,7 @@ function draw() {
   const key = JSON.stringify([
     game.selectedId,
     plot?.border,
+    plot && animator.isPending(plot.id),
     crop && [crop.species, Math.floor(crop.progress * 100), Math.round(crop.moisture)],
     game.state.inventory,
     game.state.meta.timeScale,

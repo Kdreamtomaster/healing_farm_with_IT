@@ -1,7 +1,7 @@
 {
   "friends": [
-    { "id": "haneul", "name": "하늘", "plots": ["field"] },
-    { "id": "bada", "name": "바다", "plots": ["paddy"] },
-    { "id": "bomi", "name": "봄이", "plots": ["flowerbed"] }
+    { "id": "haneul", "name": "하늘", "plots": ["field"], "shirt": "#f0c860" },
+    { "id": "bada", "name": "바다", "plots": ["paddy"], "shirt": "#5fc0b0" },
+    { "id": "bomi", "name": "봄이", "plots": ["flowerbed"], "shirt": "#f09ab0" }
   ]
 }

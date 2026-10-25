@@ -15,26 +15,61 @@ test("드론은 가까운 칸부터 들른다", () => {
   assert(order.map((p) => p.id).join() === "2,3,1", order.map((p) => p.id).join());
 });
 
-test("농부는 걸어가서 물을 딱 한 번 주고, 부탁을 차례로 처리한다", () => {
-  const animator = createAnimator();
-  const watered = [];
-  animator.farmerWater(plot(1, 7, 3), (p) => watered.push([p.id, animator.farmer.x]));
-  animator.farmerWater(plot(2, 0, 0), (p) => watered.push([p.id, animator.farmer.x]));
+const FRIENDS = [
+  { id: "haneul", name: "하늘", shirt: "#f0c860" },
+  { id: "bada", name: "바다", shirt: "#5fc0b0" },
+  { id: "bomi", name: "봄이", shirt: "#f09ab0" },
+];
+
+test("농부는 걸어가서 딱 한 번 일하고, 다 끝나면 쉰다", () => {
+  const animator = createAnimator(FRIENDS);
+  const done = [];
+  animator.work(plot(1, 7, 3), "water", (p, worker) => done.push([p.id, worker.id, worker.x]), 0);
   animator.update(0);
-  assert(watered.length === 0, "도착하기 전에는 물을 주지 않아요");
-  run(animator, 5000);
-  assert(watered.map(([id]) => id).join() === "1,2", "부탁한 순서대로 한 번씩");
-  assert(Math.abs(watered[0][1] - (7 * 16 + 3)) < 0.01, "그 칸 옆에서 물을 줘요");
-  assert(!animator.isBusy(), "다 끝나면 쉬어요");
+  assert(done.length === 0, "도착하기 전에는 일하지 않아요");
+  assert(animator.isPending(1), "가는 중인 칸");
+  run(animator, 3000);
+  assert(done.length === 1 && done[0][1] === "farmer", "농부가 한 번");
+  assert(Math.abs(done[0][2] - (7 * 16 + 3)) < 0.01, "그 칸 옆에서 일해요");
+  assert(!animator.isPending(1) && !animator.isBusy(), "다 끝나면 쉬어요");
 });
 
 test("농부는 아무리 멀어도 1초 안에 도착한다", () => {
   const animator = createAnimator();
-  let at = null;
-  animator.farmerWater(plot(1, 30, 30), () => (at = at ?? "done"));
+  animator.work(plot(1, 30, 30), "plant", () => {}, 0);
   animator.update(0);
   run(animator, 1000, 50);
-  assert(animator.farmer.x === 30 * 16 + 3, "1초에는 도착해 있어요");
+  assert(animator.workers[0].x === 30 * 16 + 3, "1초에는 도착해 있어요");
+});
+
+test("농부가 바쁘면 친구가 도우러 오고, 일을 마치면 돌아간다", () => {
+  const animator = createAnimator(FRIENDS);
+  const who = {};
+  for (let i = 0; i < 3; i++) animator.work(plot(i, i * 2, 0), "harvest", (p, worker) => (who[p.id] = worker.name ?? "농부"), 0);
+  assert(animator.workers.length === 3, "농부 + 친구 2명");
+  run(animator, 2000);
+  assert(who[0] === "농부" && who[1] === "하늘" && who[2] === "바다", JSON.stringify(who));
+  run(animator, 5000, 2050);
+  assert(animator.workers.length === 1, "친구들은 돌아가고 농부만 남아요");
+});
+
+test("일손은 최대 4명, 그 이상은 할 일이 적은 사람이 이어서 한다", () => {
+  const animator = createAnimator(FRIENDS);
+  const done = [];
+  for (let i = 0; i < 7; i++) animator.work(plot(i, i, 1), "plant", (p) => done.push(p.id), 0);
+  assert(animator.workers.length === 4, `일손 ${animator.workers.length}명`);
+  run(animator, 6000);
+  assert(done.sort((a, b) => a - b).join() === "0,1,2,3,4,5,6", "모든 일을 한 번씩");
+});
+
+test("쉬고 있는 친구가 있으면 새로 부르지 않고 그 친구가 한다", () => {
+  const animator = createAnimator(FRIENDS);
+  animator.work(plot(0, 0, 0), "water", () => {}, 0);
+  animator.work(plot(1, 1, 0), "water", () => {}, 0);
+  run(animator, 1700); // 둘 다 일을 마침 (친구는 돌아가는 중)
+  animator.work(plot(2, 0, 0), "water", () => {}, 1750);
+  animator.work(plot(3, 1, 0), "water", () => {}, 1750);
+  assert(animator.workers.length === 2, `일손 ${animator.workers.length}명`);
 });
 
 test("드론은 모든 칸에 한 번씩 물을 주고, 끝나면 done 을 한 번 부른다", () => {
