@@ -57,7 +57,8 @@ healing_farm_with_IT/
 ├── data/              ← 작물·선물·친구 같은 게임 기본 데이터 (JSON)
 ├── assets/            ← 도트 그래픽 이미지
 ├── saves/             ← 내 세이브 파일이 생기는 곳 (Git에 올리지 않음)
-└── tests/             ← 규칙이 제대로 동작하는지 확인하는 테스트
+├── tests/             ← 규칙이 제대로 동작하는지 확인하는 테스트
+└── tools/             ← 공부용 도구 (세이브를 읽기 전용으로 여는 SQL 실험 도구)
 ```
 
 각 폴더 안의 `README.md`에 **그 폴더가 왜 있는지, 어떤 기술을 어떤 의도로 쓰는지**가 적혀 있어요.
@@ -121,7 +122,7 @@ python -m unittest discover -s tests/server -t tests/server   # 서버 테스트
 
 ## 함께 배우는 것들
 
-[docs/learn/](docs/learn/)에는 게임 코드와 연결된 짧은 읽을거리가 있습니다.
+[docs/learn/](docs/learn/)에는 게임 코드와 연결된 짧은 읽을거리가 있습니다. 문서마다 실제 파일·함수 이름과, 바로 돌려 볼 수 있는 "직접 해 보기" 실험이 들어 있어요. (예: `python tools/sql.py "SELECT item, count FROM inventory"` 로 내 세이브를 읽기 전용으로 들여다보기)
 
 1. 게임 디렉터리와 코드 역할
 2. 데이터베이스와 저장소

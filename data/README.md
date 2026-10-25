@@ -19,7 +19,8 @@
 | `crops.json` | 작물: 종류 라벨, 성장 시간, 수분 라벨, 수확량, 색 | ✔ |
 | `start.json` | 새 농장: 구획 배치, 처음 씨앗, 시간 배율 | ✔ |
 | `recipes.json` | 요리: 이름, 재료와 개수 (`"ingredients": { "potato": 2, "tomato": 1 }`) | ✔ |
-| `unlocks.json` | 해금 조건: 직접 플레이 시간, 수확 횟수 | 예정 |
+| `unlocks.json` | 해금 조건: 직접 플레이 시간, 수확 수, 도감 수 → 열리는 것(희귀 색·레시피) | 6단계 |
+| `mutations.json` | 돌연변이 확률과 특징 목록(색·모양·크기) | 6단계 |
 | `crafts.json` | 꽃 공방: 꽃 → 꾸미기 물건(`kind: decor`, 놓일 자리 `spot`, 밤에 빛나면 `glow`) / 선물(`kind: gift`) | ✔ (등급 확률은 예정) |
 | `friends.json` | 친구: 이름, 맡은 구획(`plots`), 옷 색(`shirt`), 제일 좋아하는 요리(`favoriteDish`)·꽃(`favoriteFlower`) ✔ / 반응 대사는 5단계 | 일부 |
 | `lines.json` | 로딩 화면 안내 멘트 문장틀 | 예정 |
