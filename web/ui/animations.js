@@ -127,6 +127,11 @@ export function createAnimator(helpers = []) {
       return least;
     },
 
+    // 맡겨 둔 일이 모두 몇 개인지 (하는 중 + 기다리는 중)
+    pendingCount() {
+      return workers.reduce((n, w) => n + w.queue.length + (w.job ? 1 : 0), 0);
+    },
+
     // 이 칸에 누가 일하러 가는 중인지 (같은 일을 두 번 맡기지 않도록)
     isPending(plotId) {
       return workers.some((w) => w.job?.plot.id === plotId || w.queue.some((j) => j.plot.id === plotId));

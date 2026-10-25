@@ -3,6 +3,7 @@ import { loadFriends, loadManifest, loadPalette, loadSpecies, loadState, saveSta
 import { applyBorderToKind, setBorder } from "./decor/plots-style.js";
 import { BULK, bulkTargets, flood, water } from "./farm/care.js";
 import { advanceFarm } from "./farm/crops.js";
+import { nextTask } from "./farm/autopilot.js";
 import { harvest, plant } from "./farm/harvest.js";
 import { playSound, setSound, unlockAudio } from "./sound/engine.js";
 import { josa, PLOT_NAMES } from "./text.js";
@@ -54,6 +55,37 @@ const game = {
 let lastTick = boot.serverNow;
 let busy = false; // 비운 시간을 처리하는 동안에는 1초 시계를 멈춥니다
 
+// ── 멍때리기 모드 ──
+// 농부들이 알아서 수확하고, 물 주고, 씨앗을 심어요 (작물과 색은 무작위). 메뉴는 숨기고 농장을 크게 보여 줘요.
+// 켜 두었는지는 이 컴퓨터의 취향이라 브라우저에 보관해요.
+const IDLE_KEY = "healing-farm-idle";
+const IDLE_STEP_MS = 1200; // 이만큼마다 할 일을 하나씩 찾아요
+const IDLE_MAX_JOBS = 3; // 한꺼번에 맡기는 일은 이만큼까지 (느긋하게)
+let idleMode = false;
+try {
+  idleMode = localStorage.getItem(IDLE_KEY) === "on";
+} catch {
+  // 브라우저 저장이 막혀 있으면 꺼진 채로 시작
+}
+
+function setIdleMode(on) {
+  idleMode = on;
+  try {
+    localStorage.setItem(IDLE_KEY, on ? "on" : "off");
+  } catch {
+    // 저장이 안 돼도 지금 화면에서는 바뀌어요
+  }
+  document.body.classList.toggle("idle-mode", on);
+  document.getElementById("idle-btn").textContent = on ? "🍃 멍때리기 끝내기" : "🍃 멍때리기";
+  fitScreen();
+}
+
+function idleStep() {
+  if (!idleMode || busy || document.hidden || animator.pendingCount() >= IDLE_MAX_JOBS) return;
+  const task = nextTask(game.state, speciesList, (id) => animator.isPending(id));
+  if (task) sendWorker(task.plot, task, { quiet: true });
+}
+
 // ── 반응형 화면 ──
 // 가로로 넓은 화면(16:9 PC)은 농장 옆에 메뉴, 세로 화면(9:16, 갤럭시 S25)이나 좁은 화면은 농장 아래에 메뉴.
 // 세로 화면에서는 창고 마당도 밭 아래로 옮겨서 폭을 좁혀요.
@@ -63,19 +95,19 @@ let layout;
 
 function fitScreen() {
   const portrait = innerHeight > innerWidth;
-  const side = !portrait && innerWidth >= SIDE_PANEL_MIN_WIDTH;
+  const side = !portrait && innerWidth >= SIDE_PANEL_MIN_WIDTH && !idleMode;
   document.body.classList.toggle("stacked", !side);
   layout = computeLayout(game.state.plots, portrait);
   canvas.width = layout.width;
   canvas.height = layout.height;
   const header = document.querySelector("header").offsetHeight;
   const availableWidth = innerWidth - 32 - (side ? PANEL_WIDTH + 16 : 0);
-  const availableHeight = side ? innerHeight - header - 32 : (innerHeight - header) * (portrait ? 0.55 : 0.75);
+  const availableHeight = side || idleMode ? innerHeight - header - 32 : (innerHeight - header) * (portrait ? 0.55 : 0.75);
   const zoom = fitZoom(layout, availableWidth, availableHeight);
   canvas.style.width = `${Math.floor(layout.width * zoom)}px`;
 }
-fitScreen();
 addEventListener("resize", fitScreen);
+setIdleMode(idleMode); // 버튼 글자와 화면 크기 맞추기 (fitScreen 포함)
 
 function selectedPlot() {
   return game.state.plots.find((p) => p.id === game.selectedId) ?? null;
@@ -95,18 +127,39 @@ function report(result, action, detail, sound, actor = "player") {
   draw();
 }
 
-// 선택한 칸에 사람을 보내 일을 맡겨요. 도착해서 rule(plot) 으로 실제 일을 하고 결과를 알려 줘요.
-// 농부가 바쁘면 친구가 도우러 오고, 친구가 한 일은 친구 이름으로 알리고 기록해요.
-function sendWorker(kind, rule, sound) {
-  const plot = selectedPlot();
-  if (animator.isPending(plot.id)) return report({ ok: false, message: "이 칸에는 벌써 일하러 가고 있어요" });
+// 일 종류마다, 사람이 칸에 도착해서 실제로 하는 일 (task 에는 심을 작물과 색 같은 정보)
+const JOB_RULES = {
+  plant: (p, task) => plant(game.state, p, speciesById.get(task.speciesId), task.colorId),
+  // 흙이 젖는 건 물뿌리개를 기울이는 순간이에요
+  water: (p) => (water(p) ? { ok: true, message: "물을 줬어요" } : { ok: false, message: "물을 줄 작물이 없어요" }),
+  flood: (p) => (flood(p) ? { ok: true, message: "논에 물을 가득 채웠어요" } : { ok: false, message: "물을 댈 수 없어요" }),
+  harvest: (p) => (p.crop ? harvest(game.state, p, speciesById.get(p.crop.species)) : { ok: false, message: "수확할 작물이 없어요" }),
+};
+const JOB_SOUNDS = { plant: "plant", water: "water", flood: "water", harvest: "harvest" };
+
+// 칸에 사람을 보내 일을 맡겨요. 농부가 바쁘면 친구가 도우러 오고, 친구가 한 일은 친구 이름으로 알리고 기록해요.
+//   quiet: 멍때리기 모드처럼 알림 없이 조용히 (효과음과 기록은 남아요)
+function sendWorker(plot, task, { quiet = false } = {}) {
+  if (animator.isPending(plot.id)) {
+    if (!quiet) report({ ok: false, message: "이 칸에는 벌써 일하러 가고 있어요" });
+    return;
+  }
   animator.work(
     plot,
-    kind,
+    task.kind,
     (p, worker) => {
-      const result = rule(p);
+      const result = JOB_RULES[task.kind](p, task);
+      const actor = worker.name ?? (quiet ? "멍때리기" : "player");
+      if (quiet) {
+        if (result.ok) {
+          record(task.kind, `${p.id}`, actor);
+          playSound(JOB_SOUNDS[task.kind]);
+        }
+        draw();
+        return;
+      }
       const message = worker.name && result.ok ? `${josa(worker.name, "이가", "가")} 도와줬어요. ${result.message}` : result.message;
-      report({ ...result, message }, kind, `${p.id}`, sound, worker.name ?? "player");
+      report({ ...result, message }, task.kind, `${p.id}`, JOB_SOUNDS[task.kind], actor);
     },
     performance.now(),
   );
@@ -116,20 +169,19 @@ function sendWorker(kind, rule, sound) {
 const actions = {
   plant(speciesId, colorId) {
     game.preview = null;
-    sendWorker("plant", (p) => plant(game.state, p, speciesById.get(speciesId), colorId), "plant");
+    sendWorker(selectedPlot(), { kind: "plant", speciesId, colorId });
   },
   preview(speciesId, colorId) {
     game.preview = speciesId ? { plotId: game.selectedId, speciesId, colorId } : null;
   },
-  // 흙이 젖는 건 물뿌리개를 기울이는 순간이에요
   water() {
-    sendWorker("water", (p) => (water(p) ? { ok: true, message: "물을 줬어요" } : { ok: false, message: "물을 줄 작물이 없어요" }), "water");
+    sendWorker(selectedPlot(), { kind: "water" });
   },
   flood() {
-    sendWorker("flood", (p) => (flood(p) ? { ok: true, message: "논에 물을 가득 채웠어요" } : { ok: false, message: "물을 댈 수 없어요" }), "water");
+    sendWorker(selectedPlot(), { kind: "flood" });
   },
   harvest() {
-    sendWorker("harvest", (p) => (p.crop ? harvest(game.state, p, speciesById.get(p.crop.species)) : { ok: false, message: "수확할 작물이 없어요" }), "harvest");
+    sendWorker(selectedPlot(), { kind: "harvest" });
   },
   // 일괄 관리는 기계가 도와줘요: 목마른 작물은 드론, 물 많이 먹는 작물은 스프링클러, 논은 물길
   bulk(kind) {
@@ -242,7 +294,7 @@ async function tick() {
   }
   lastTick = now;
   advanceFarm(game.state, speciesById, realMsToGameMinutes(elapsed, game.state.meta.timeScale));
-  game.state.meta.playSeconds += elapsed / 1000; // 직접 플레이한 시간
+  if (!idleMode) game.state.meta.playSeconds += elapsed / 1000; // 직접 플레이한 시간 (멍때리기는 빼요)
   draw();
 }
 
@@ -287,6 +339,7 @@ canvas.addEventListener("click", (event) => {
   draw();
 });
 document.getElementById("save-btn").addEventListener("click", () => save());
+document.getElementById("idle-btn").addEventListener("click", () => setIdleMode(!idleMode));
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) tick(); // 돌아오자마자 비운 시간 처리
 });
@@ -310,3 +363,4 @@ await catchUp(game.state.meta.lastSavedAt, boot.serverNow); // 마지막 저장�
 busy = false;
 startAutosave(save);
 setInterval(tick, 1000);
+setInterval(idleStep, IDLE_STEP_MS);

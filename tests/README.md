@@ -40,6 +40,7 @@ python -m unittest discover -s tests/server -t tests/server
 | `web/time.test.js` | 비운 시간 0·음수·5일 초과, 배율, 친구들의 물주기·수확, 나눠 처리해도 같은 결과, 안내 문장 |
 | `web/animations.test.js` | 농부·친구·드론·스프링클러·물길이 칸마다 한 번씩 일하는지, 순서, 1초 안 도착, 일손 최대 4명, 친구가 돌아가는지 |
 | `web/layout.test.js` | 가로·세로 화면 배치, 창고가 화면 안에 들어가는지, 정수 확대 배율 |
+| `web/autopilot.test.js` | 멍때리기 모드의 일 순서, 무작위 색, 가는 중인 칸 건너뛰기 |
 | `web/index.html`, `web/runner.js` | 브라우저용 작은 테스트 도구 |
 
 서버 테스트는 실제 `saves/` 대신 임시 폴더(`…/내 게임/힐링 농장/`)를 써서 내 세이브를 건드리지 않아요.

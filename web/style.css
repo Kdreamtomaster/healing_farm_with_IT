@@ -328,3 +328,13 @@ header {
     touch-action: manipulation;
   }
 }
+
+/* 멍때리기 모드: 메뉴를 숨기고 농장만 크게 */
+button.ghost {
+  background: var(--card);
+  color: var(--accent-dark);
+}
+
+body.idle-mode #panel {
+  display: none;
+}
