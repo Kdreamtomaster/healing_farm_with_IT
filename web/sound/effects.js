@@ -49,6 +49,13 @@ export const EFFECTS = {
     { note: "E6", at: 0.2, len: 0.12 },
     { note: "C6", at: 0.34, len: 0.3, wave: "triangle", volume: 0.24 },
   ],
+  // 고양이를 쓰다듬으면 "가르릉" — 낮은 음이 떨리듯
+  purr: [0, 0.07, 0.14, 0.21, 0.28, 0.35].map((at, i) => ({ note: i % 2 ? "D3" : "C3", at, len: 0.08, wave: "triangle", volume: 0.3 })),
+  // 비가 오기 시작할 때, 무지개가 뜰 때
+  weather: [
+    { note: "E6", at: 0, len: 0.2, wave: "triangle", volume: 0.16 },
+    { note: "B5", at: 0.15, len: 0.3, wave: "triangle", volume: 0.16 },
+  ],
   // 수확: 도-미-솔-도 올라가는 소리
   harvest: [
     { note: "C5", at: 0, len: 0.08 },

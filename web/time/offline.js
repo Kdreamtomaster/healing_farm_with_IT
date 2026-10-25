@@ -1,6 +1,7 @@
 // 비운 시간 계산과 오프라인 시뮬레이션입니다.
 // 플레이 중과 똑같은 규칙(farm/)에 시간만 넣어 돌리므로, 접속해 있든 아니든 작물은 같은 방식으로 자랍니다.
 import { advanceFarm } from "../farm/crops.js";
+import { farmSeed, isRaining } from "../farm/weather.js";
 import { realMsToGameMinutes } from "./clock.js";
 import { friendsHelp } from "./helpers.js";
 
@@ -17,7 +18,7 @@ export function planOffline(fromMs, toMs, timeScale) {
 }
 
 export function newReport() {
-  return { minutes: 0, friends: {} };
+  return { minutes: 0, rainMinutes: 0, friends: {} };
 }
 
 // minutes(게임 분)를 10분 조각으로 나눠, 조각마다 작물이 자라고 친구들이 돌봅니다.
@@ -27,6 +28,7 @@ export function simulateOffline(state, speciesById, friends, minutes, report = n
   while (left > 0) {
     const dt = Math.min(CHUNK_MINUTES, left);
     left -= dt;
+    if (isRaining(state.meta.gameMinutes, farmSeed(state))) report.rainMinutes += dt;
     advanceFarm(state, speciesById, dt);
     friendsHelp(state, speciesById, friends, report);
     report.minutes += dt;

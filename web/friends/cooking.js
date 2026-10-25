@@ -33,6 +33,21 @@ export function cook(state, recipe) {
   return started.ok ? finishCooking(state, recipe) : started;
 }
 
+// 이 요리를 제일 좋아하는 친구들 (나눠 먹을 때 머리 위에 ★)
+export function fansOf(recipe, friends) {
+  return friends.filter((friend) => friend.favoriteDish === recipe.id);
+}
+
+// 나눠 먹은 뒤의 한마디. 좋아하는 요리였다면 그 친구 이야기를 덧붙여요.
+export function shareMessage(recipe, friends) {
+  const fans = fansOf(recipe, friends).map((f) => f.name);
+  const base = `다 같이 ${josa(recipe.name.ko, "을", "를")} 맛있게 먹었어요!`;
+  if (!fans.length) return base;
+  // 하늘·봄이가 → 조사는 마지막 이름에만 붙여요
+  const who = [...fans.slice(0, -1), josa(fans[fans.length - 1], "이가", "가")].join("·");
+  return `${base} ${who} 제일 좋아하는 요리래요 ★`;
+}
+
 export function share(state, recipe) {
   const name = recipe.name.ko;
   if (!takeItem(state, dishId(recipe.id))) return { ok: false, message: `${josa(name, "이", "가")} 없어요` };

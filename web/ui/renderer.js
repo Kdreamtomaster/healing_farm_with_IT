@@ -2,11 +2,16 @@
 // 캔버스는 실제 픽셀 크기(칸 하나 16×16)로 그리고, CSS 로 화면에 맞게 확대합니다.
 // (style.css 의 image-rendering: pixelated 덕분에 흐려지지 않아요)
 //
-// 그리는 순서: 배경(풀·나무·헛간) → 창고(상자·자루) → 밭과 작물 → 계절 색조 → 사람·드론 → 계절 입자 → 선택 표시
-// scene = { layout, state, speciesList, speciesById, palette, sprites, selectedId, preview, animator, time }
+// 그리는 순서: 배경(풀·나무·헛간) → 창고(상자·자루)·고양이 → 밭과 작물 → 사람·드론
+//   → 계절 색조 → 날씨 색조 → 하루의 빛 → 밤 불빛과 별 → 무지개 → 나비 → 계절 입자 → 비·눈 → 선택 표시
+// scene = { layout, state, speciesList, speciesById, palette, sprites, selectedId, preview, animator, cat, time }
 //   time: 애니메이션용 시각(ms). 흔들리는 작물, 계절 효과가 이 값으로 움직여요.
 import { borderColor, cropColor, mixColors } from "../decor/palette.js";
+import { lightAt } from "../decor/daylight.js";
 import { seasonOf } from "../decor/season.js";
+import { farmSeed, weatherAt } from "../farm/weather.js";
+import { drawButterflies, drawCat } from "./critters.js";
+import { drawLight, drawNightLights, drawPrecipitation, drawRainbow, drawWeatherTint } from "./sky.js";
 import { isThirsty, stageOf } from "../farm/crops.js";
 import { TILE } from "./layout.js";
 import { drawScenery, drawStorage } from "./scenery.js";
@@ -25,8 +30,12 @@ export function drawFarm(ctx, scene) {
   const { layout, state, speciesById, palette, sprites, selectedId, preview, time } = scene;
   const season = seasonOf(state.meta.gameMinutes).id;
   const look = palette.seasons[season];
+  const gameMinutes = state.meta.gameMinutes;
+  const weather = weatherAt(gameMinutes, farmSeed(state));
+  const light = lightAt(gameMinutes);
   drawScenery(ctx, layout, palette, sprites, look, time);
   drawStorage(ctx, layout, state, scene.speciesList, sprites);
+  if (scene.cat) drawCat(ctx, scene.cat, layout, sprites, light.night, time);
   const beat = Math.floor(time / SWAY_MS);
   ctx.save();
   ctx.translate(layout.farm.x, layout.farm.y); // 여기부터는 밭 기준 좌표
@@ -48,16 +57,20 @@ export function drawFarm(ctx, scene) {
       ctx.globalAlpha = 1;
     }
   }
+  scene.animator?.draw(ctx, sprites, time); // 농부와 친구들, 드론, 스프링클러, 물길
   ctx.restore();
   ctx.fillStyle = look.tint;
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  ctx.save();
-  ctx.translate(layout.farm.x, layout.farm.y);
-  scene.animator?.draw(ctx, sprites, time); // 농부와 친구들, 드론, 스프링클러, 물길
-  const selected = state.plots.find((p) => p.id === selectedId);
-  if (selected) drawSelection(ctx, selected.x * TILE, selected.y * TILE);
-  ctx.restore();
+  drawWeatherTint(ctx, weather);
+  drawLight(ctx, light);
+  drawNightLights(ctx, layout, light, weather, time);
+  if (weather === "rainbow") drawRainbow(ctx, layout);
+  const sunnyDay = light.darkness < 0.1 && (weather === "sunny" || weather === "rainbow");
+  if (sunnyDay && (season === "spring" || season === "summer")) drawButterflies(ctx, layout, time);
   drawParticles(ctx, season, look.particle, time);
+  drawPrecipitation(ctx, weather, time);
+  const selected = state.plots.find((p) => p.id === selectedId);
+  if (selected) drawSelection(ctx, layout.farm.x + selected.x * TILE, layout.farm.y + selected.y * TILE);
 }
 
 function drawSoil(ctx, ox, oy, plot, palette) {

@@ -22,7 +22,9 @@
     "farmer_walk": 2,
     "farmer_pour": 2,
     "farmer_work": 2,
-    "drone": 2
+    "drone": 2,
+    "cat_sit": 2,
+    "cat_sleep": 2
   },
   "effects": {
     "drop": "effects/drop_1.png"

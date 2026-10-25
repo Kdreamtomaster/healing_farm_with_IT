@@ -23,6 +23,7 @@ export function summarize(plan, report, speciesById, friends) {
   // "분", "시간", "일" 은 모두 받침이 있어 "이" 가 붙어요
   lines.push(`게임 속에서는 ${formatDuration(plan.gameMinutes * 60000)}이 흘렀어요.`);
 
+  if (report.rainMinutes >= 60) lines.push("그동안 비가 내려서 작물들이 촉촉하게 물을 마셨어요.");
   let anyone = false;
   for (const friend of friends) {
     const done = report.friends[friend.id];

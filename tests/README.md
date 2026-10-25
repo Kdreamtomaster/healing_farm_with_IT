@@ -42,6 +42,8 @@ python -m unittest discover -s tests/server -t tests/server
 | `web/layout.test.js` | 가로·세로 화면 배치, 창고가 화면 안에 들어가는지, 정수 확대 배율 |
 | `web/autopilot.test.js` | 멍때리기 모드의 일 순서, 무작위 색, 가는 중인 칸 건너뛰기 |
 | `web/cooking.test.js` | 요리 재료 소비·모자란 재료·끓는 동안 재료 중복 방지·나눠 먹기 |
+| `web/weather.test.js` | 같은 날은 같은 날씨, 비 시간대, 겨울엔 눈, 흐림→비→무지개, 비가 흙을 알맞게, 하루의 빛 |
+| `web/nature.test.js` | 새소리·풀벌레·빗소리가 실제로 (작게) 나는지 |
 | `web/index.html`, `web/runner.js` | 브라우저용 작은 테스트 도구 |
 
 서버 테스트는 실제 `saves/` 대신 임시 폴더(`…/내 게임/힐링 농장/`)를 써서 내 세이브를 건드리지 않아요.

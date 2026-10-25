@@ -53,3 +53,23 @@ test("누가 가는 중인 칸은 고르지 않고, 할 일이 없으면 null", 
   const state = farm();
   assert(nextTask(state, SPECIES, (id) => id === 0, random) === null, "빈 밭은 이미 누가 가는 중, 논은 씨앗 없음");
 });
+
+const RECIPES = [
+  { id: "caprese", ingredients: { tomato: 2 } },
+  { id: "rice_ball", ingredients: { rice: 2 } },
+];
+
+test("멍때리기 부엌일: 한동안 안 먹었고 요리가 있으면 다 같이 먹는다", async () => {
+  const { nextKitchenTask, FEAST_EVERY_MS } = await import("../../web/farm/autopilot.js");
+  const state = { inventory: { dish_caprese: 1, tomato: 5 } };
+  assert(nextKitchenTask(state, RECIPES, { feasting: false, msSinceFeast: FEAST_EVERY_MS }, random).kind === "share");
+  const soon = nextKitchenTask(state, RECIPES, { feasting: false, msSinceFeast: 1000 }, random);
+  assert(soon.kind === "cook" && soon.recipeId === "caprese", "방금 먹었으면 요리를 해 둬요");
+  assert(nextKitchenTask(state, RECIPES, { feasting: true, msSinceFeast: FEAST_EVERY_MS }, random).kind === "cook", "먹는 중이면 또 차리지 않아요");
+});
+
+test("멍때리기 부엌일: 같은 요리는 2접시까지, 재료가 없으면 할 일 없음", async () => {
+  const { nextKitchenTask } = await import("../../web/farm/autopilot.js");
+  assert(nextKitchenTask({ inventory: { dish_caprese: 2, tomato: 9 } }, RECIPES, { feasting: true, msSinceFeast: 0 }, random) === null);
+  assert(nextKitchenTask({ inventory: { tomato: 1 } }, RECIPES, { feasting: false, msSinceFeast: 0 }, random) === null);
+});

@@ -1,7 +1,9 @@
 // 오른쪽 패널(선택한 칸, 일괄 관리, 창고, 설정)과 위쪽 상태 줄을 그립니다.
 // 버튼을 누르면 actions 의 함수를 부를 뿐, 규칙 계산은 하지 않습니다.
 import { cropColor } from "../decor/palette.js";
+import { lightAt, partOfDay } from "../decor/daylight.js";
 import { formatCalendar, seasonOf } from "../decor/season.js";
+import { farmSeed, WEATHER_ICONS, weatherAt } from "../farm/weather.js";
 import { BULK } from "../farm/care.js";
 import { PLOT_FOR_TYPE, WATER_RANGE, stageOf } from "../farm/crops.js";
 import { seedId } from "../farm/harvest.js";
@@ -13,7 +15,9 @@ import { el } from "./dom.js";
 
 export function renderHeader(game, palette) {
   const { meta } = game.state;
-  document.getElementById("clock").textContent = `${formatCalendar(meta.gameMinutes, palette)} · 시간 배율 ×${meta.timeScale}`;
+  const weather = weatherAt(meta.gameMinutes, farmSeed(game.state));
+  document.getElementById("clock").textContent =
+    `${formatCalendar(meta.gameMinutes, palette)} · ${partOfDay(meta.gameMinutes)} ${weatherIcon(weather, meta.gameMinutes)} · 시간 배율 ×${meta.timeScale}`;
   // 계절에 따라 화면 바탕색도 살짝 바뀌어요
   document.documentElement.style.setProperty("--bg", palette.seasons[seasonOf(meta.gameMinutes).id].page);
   const saved = new Date(meta.lastSavedAt);
@@ -21,6 +25,11 @@ export function renderHeader(game, palette) {
     `마지막 저장 ${String(saved.getHours()).padStart(2, "0")}:${String(saved.getMinutes()).padStart(2, "0")}`;
   document.getElementById("integrity-badge").hidden = game.integrity === "ok";
   document.getElementById("save-btn").disabled = game.integrity !== "ok";
+}
+
+// 맑은 밤에는 해 대신 달
+function weatherIcon(weather, gameMinutes) {
+  return weather === "sunny" && lightAt(gameMinutes).night ? "🌙" : WEATHER_ICONS[weather];
 }
 
 export function renderPanel(root, game, data, actions) {
@@ -136,6 +145,12 @@ function settingsCard(state, actions) {
       { class: "toggle" },
       el("input", { type: "checkbox", checked: sound.music, onchange: (e) => actions.setSound({ music: e.target.checked }) }),
       " 배경음",
+    ),
+    el(
+      "label",
+      { class: "toggle" },
+      el("input", { type: "checkbox", checked: sound.nature, onchange: (e) => actions.setSound({ nature: e.target.checked }) }),
+      " 자연의 소리 (새소리·풀벌레·빗소리)",
     ),
     el(
       "label",

@@ -31,6 +31,8 @@ assets/
 │   ├── farmer_walk_1.png, farmer_walk_2.png   ← 걷는 농부 (오른쪽을 봄, 왼쪽은 뒤집어 그림)
 │   ├── farmer_pour_1.png, farmer_pour_2.png   ← 물뿌리개 기울이기
 │   ├── farmer_work_1.png, farmer_work_2.png   ← 쪼그려 심기·수확
+│   ├── cat_sit_1.png, cat_sit_2.png           ← 앉아서 꼬리 살랑 고양이
+│   ├── cat_sleep_1.png, cat_sleep_2.png       ← 동그랗게 잠든 고양이
 │   │     (옷 색 #6fb0dc 는 도와주러 온 친구의 옷 색으로 바꿔 그림)
 │   └── drone_1.png, drone_2.png               ← 프로펠러가 도는 드론
 ├── scenery/          ← 배경

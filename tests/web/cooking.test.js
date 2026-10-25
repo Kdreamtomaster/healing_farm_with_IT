@@ -35,3 +35,12 @@ test("나눠 먹으면 요리가 하나 줄고, 없으면 나눌 수 없다", ()
   assert(state.inventory.dish_potato_soup === 0);
   assert(!share(state, SOUP).ok);
 });
+
+test("좋아하는 요리를 나눠 먹으면 그 친구 이야기를 덧붙인다", async () => {
+  const { fansOf, shareMessage } = await import("../../web/friends/cooking.js");
+  const friends = [{ id: "a", name: "하늘", favoriteDish: "caprese" }, { id: "b", name: "바다", favoriteDish: "rice_ball" }, { id: "c", name: "봄이", favoriteDish: "caprese" }];
+  const caprese = { id: "caprese", name: { ko: "토마토 카프레제" } };
+  assert(fansOf(caprese, friends).map((f) => f.id).join() === "a,c");
+  assert(shareMessage(caprese, friends) === "다 같이 토마토 카프레제를 맛있게 먹었어요! 하늘·봄이가 제일 좋아하는 요리래요 ★", shareMessage(caprese, friends));
+  assert(shareMessage({ id: "omurice", name: { ko: "오므라이스" } }, friends) === "다 같이 오므라이스를 맛있게 먹었어요!");
+});

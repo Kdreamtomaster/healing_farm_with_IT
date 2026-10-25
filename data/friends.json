@@ -1,7 +1,7 @@
 {
   "friends": [
-    { "id": "haneul", "name": "하늘", "plots": ["field"], "shirt": "#f0c860" },
-    { "id": "bada", "name": "바다", "plots": ["paddy"], "shirt": "#5fc0b0" },
-    { "id": "bomi", "name": "봄이", "plots": ["flowerbed"], "shirt": "#f09ab0" }
+    { "id": "haneul", "name": "하늘", "plots": ["field"], "shirt": "#f0c860", "favoriteDish": "caprese" },
+    { "id": "bada", "name": "바다", "plots": ["paddy"], "shirt": "#5fc0b0", "favoriteDish": "rice_ball" },
+    { "id": "bomi", "name": "봄이", "plots": ["flowerbed"], "shirt": "#f09ab0", "favoriteDish": "potato_salad" }
   ]
 }

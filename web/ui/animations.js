@@ -5,6 +5,7 @@
 // 연출이 그 칸에 닿는 순간에 실행합니다. 그래서 흙이 젖는 순간과 그림이 딱 맞아요.
 //
 // 시간은 모두 now(ms)로 받습니다. 화면에서는 requestAnimationFrame 의 시각을, 테스트에서는 아무 숫자나 넣어요.
+import { drawBubble } from "./critters.js";
 import { TILE } from "./layout.js";
 
 const FARMER_SPEED = 6 * TILE; // 1초에 6칸 (px/s)
@@ -51,6 +52,8 @@ const JOBS = {
 const plotSpot = (plot) => ({ x: plot.x * TILE + 3, y: plot.y * TILE + 14 });
 const MAX_WORKERS = 4; // 농부 + 도와주러 오는 친구 최대 3명
 const EXIT_X = -28; // 친구들은 화면 왼쪽 밖에서 들어오고 나가요 (밭 왼쪽 풀밭 1칸 너머)
+const EMOTE_MS = 2000; // 머리 위 말풍선이 떠 있는 시간
+const HUM_CHANCE = 0.2; // 밭일을 하다가 가끔 콧노래(♪)
 
 // helpers: 바쁠 때 도와주러 오는 친구들 [{ id, name, shirt }] (data/friends.json)
 export function createAnimator(helpers = []) {
@@ -58,6 +61,7 @@ export function createAnimator(helpers = []) {
   const workers = [farmer];
   const effects = [];
   const isIdle = (w) => !w.job && !w.queue.length;
+  let resting = false; // 밤에 쉬는 중 (쉬고 있는 농부 머리 위에 쿨쿨)
 
   function walkTo(worker, to, now) {
     worker.walk = { from: { x: worker.x, y: worker.y }, to, start: now, ms: Math.min(MAX_WALK_MS, travelMs(worker, to, FARMER_SPEED)) };
@@ -86,6 +90,7 @@ export function createAnimator(helpers = []) {
         if (!step(worker, now)) return;
         job.arrived = now;
         worker.facing = job.facing ?? 1;
+        if (job.emote) worker.emote = { icon: job.emote, until: now + EMOTE_MS };
       }
       const t = now - job.arrived;
       const { ms, hitMs } = JOBS[job.kind];
@@ -135,18 +140,20 @@ export function createAnimator(helpers = []) {
     //   kind: "water" | "flood" | "plant" | "harvest"
     //   apply(plot, worker): 그 칸에서 실제로 일을 하는 함수 (worker.name 이 있으면 친구가 한 일)
     work(plot, kind, apply, now) {
-      return assign({ plot, at: plotSpot(plot), kind, apply: (worker) => apply(plot, worker) });
+      const emote = Math.random() < HUM_CHANCE ? "note" : null;
+      return assign({ plot, at: plotSpot(plot), kind, emote, apply: (worker) => apply(plot, worker) });
     },
 
     // 화덕에서 요리하기: spot 은 화덕 왼쪽 발 위치(밭 기준 좌표). 다 되면 apply(worker)
     cook(spot, apply) {
-      return assign({ at: spot, kind: "cook", apply });
+      return assign({ at: spot, kind: "cook", emote: "note", apply });
     },
 
     // 다 같이 나눠 먹기: 농부와 친구들이 돗자리(seats)에 둘러앉아 먹어요. 하던 일이 있으면 마치고 와요.
     //   seats: [{ x, y, facing }] 사람 수만큼, dish: 가운데 놓을 요리 그림 이름, center: 요리 놓을 자리
+    //   favorites: 이 요리를 제일 좋아하는 사람 id 들 (머리 위에 ★, 다른 사람은 ♥)
     //   모두 다 먹으면 done()
-    feast(seats, dish, center, done) {
+    feast(seats, dish, center, done, favorites = new Set()) {
       const people = [farmer, ...helpers.map((h) => workers.find((w) => w.id === h.id) ?? h)];
       let eating = people.length;
       const feast = { kind: "feast", dish, center, finished: false, update: () => !feast.finished };
@@ -157,7 +164,8 @@ export function createAnimator(helpers = []) {
         done();
       };
       people.forEach((person, i) => {
-        const job = { at: seats[i % seats.length], facing: seats[i % seats.length].facing, kind: "eat", apply: finish };
+        const seat = seats[i % seats.length];
+        const job = { at: seat, facing: seat.facing, kind: "eat", emote: favorites.has(person.id) ? "star" : "heart", apply: finish };
         if (workers.includes(person)) person.queue.push(job);
         else callFriend(person, seats[i % seats.length].y, job);
       });
@@ -270,10 +278,19 @@ export function createAnimator(helpers = []) {
       return workers.length > 1 || !isIdle(farmer) || effects.length > 0;
     },
 
+    // 밤에 쉬는 시간이면 true (멍때리기 모드)
+    setResting(on) {
+      resting = on;
+    },
+
     draw(ctx, sprites, now) {
       for (const effect of effects) DRAW[effect.kind](ctx, sprites, effect, now);
       // 아래쪽(화면 앞)에 있는 사람을 나중에 그려야 겹칠 때 자연스러워요
-      for (const worker of [...workers].sort((a, b) => a.y - b.y)) drawWorker(ctx, sprites, worker, now);
+      for (const worker of [...workers].sort((a, b) => a.y - b.y)) {
+        drawWorker(ctx, sprites, worker, now);
+        const bubble = worker.emote && now < worker.emote.until ? worker.emote.icon : resting && isIdle(worker) ? "zzz" : null;
+        if (bubble) drawBubble(ctx, bubble, worker.x - 4, worker.y - 26 - (Math.floor(now / 500) % 2));
+      }
     },
   };
 }

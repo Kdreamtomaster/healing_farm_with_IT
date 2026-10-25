@@ -5,6 +5,9 @@ import { isThirsty, PLOT_FOR_TYPE, stageOf } from "./crops.js";
 import { seedId } from "./harvest.js";
 import { itemCount } from "../state.js";
 
+export const FEAST_EVERY_MS = 3 * 60 * 1000; // 멍때리기 모드에서 다 같이 먹는 건 3분에 한 번쯤
+const KEEP_DISHES = 2; // 같은 요리는 2접시까지만 만들어 둬요
+
 const pick = (list, random) => list[Math.floor(random() * list.length)];
 
 // 다음에 할 일 하나: { kind, plot, speciesId?, colorId? } 또는 할 일이 없으면 null
@@ -35,5 +38,17 @@ export function nextTask(state, speciesList, isPending, random = Math.random) {
     const species = pick(choices, random);
     return { kind: "plant", plot, speciesId: species.id, colorId: pick(species.colors, random).id };
   }
+  return null;
+}
+
+// 멍때리기 모드의 부엌일: 요리가 있고 한동안 안 먹었으면 다 같이 먹기, 아니면 재료가 있는 요리 하나 만들기
+//   → { kind: "share" | "cook", recipeId } 또는 null
+export function nextKitchenTask(state, recipes, { feasting, msSinceFeast }, random = Math.random) {
+  const dishes = recipes.filter((r) => itemCount(state, `dish_${r.id}`) > 0);
+  if (dishes.length && !feasting && msSinceFeast >= FEAST_EVERY_MS) return { kind: "share", recipeId: pick(dishes, random).id };
+  const cookable = recipes.filter(
+    (r) => itemCount(state, `dish_${r.id}`) < KEEP_DISHES && Object.entries(r.ingredients).every(([item, need]) => itemCount(state, item) >= need),
+  );
+  if (cookable.length) return { kind: "cook", recipeId: pick(cookable, random).id };
   return null;
 }

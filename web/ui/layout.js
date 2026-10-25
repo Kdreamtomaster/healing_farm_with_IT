@@ -25,6 +25,7 @@ export function computeLayout(plots, portrait) {
       height: farmBottom + 2 * TILE,
       farm,
       kitchen: { x: yard.x + 4, y: yard.y + 16 }, // 화덕 (요리하는 곳)
+      cat: { x: yard.x + 58, y: yard.y + 17 }, // 헛간 옆 고양이
       picnic: { x: farm.x + farm.w / 2 - 20, y: farmBottom + 10, w: 40, h: 12 }, // 나눠 먹는 돗자리
       barn: { x: yard.x + 24, y: yard.y },
       crates: { x: yard.x + 8, y: yard.y + 34 }, // 수확물 상자 줄
@@ -40,6 +41,7 @@ export function computeLayout(plots, portrait) {
     height: yardY + 68,
     farm,
     kitchen: { x: farm.x + 112, y: yardY + 4 },
+    cat: { x: farm.x + 28, y: yardY + 18 },
     picnic: { x: farm.x + farm.w / 2 - 20, y: yardY + 48, w: 40, h: 12 },
     barn: { x: farm.x, y: yardY },
     crates: { x: farm.x + 44, y: yardY },

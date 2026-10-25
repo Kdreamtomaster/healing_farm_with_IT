@@ -3,16 +3,20 @@ import { loadFriends, loadManifest, loadPalette, loadRecipes, loadSpecies, loadS
 import { applyBorderToKind, setBorder } from "./decor/plots-style.js";
 import { BULK, bulkTargets, flood, water } from "./farm/care.js";
 import { advanceFarm } from "./farm/crops.js";
-import { nextTask } from "./farm/autopilot.js";
-import { finishCooking, share, startCooking } from "./friends/cooking.js";
+import { lightAt, isRestTime } from "./decor/daylight.js";
+import { seasonOf } from "./decor/season.js";
+import { nextKitchenTask, nextTask } from "./farm/autopilot.js";
+import { farmSeed, weatherAt } from "./farm/weather.js";
+import { fansOf, finishCooking, share, shareMessage, startCooking } from "./friends/cooking.js";
 import { harvest, plant } from "./farm/harvest.js";
-import { playSound, setSound, unlockAudio } from "./sound/engine.js";
+import { playSound, setNatureEnv, setSound, unlockAudio } from "./sound/engine.js";
 import { josa, PLOT_NAMES } from "./text.js";
 import { startAutosave } from "./time/autosave.js";
 import { MINUTES_PER_DAY, realMsToGameMinutes } from "./time/clock.js";
 import { newReport, planOffline, simulateOffline } from "./time/offline.js";
 import { reportToLog, summarize } from "./time/summary.js";
 import { createAnimator } from "./ui/animations.js";
+import { catRect, createCat, petCat } from "./ui/critters.js";
 import { hideLoading, showProgress, showSummary } from "./ui/loading.js";
 import { renderHeader, renderPanel } from "./ui/panels.js";
 import { computeLayout, fitZoom, picnicSeats } from "./ui/layout.js";
@@ -44,6 +48,7 @@ const speciesById = new Map(speciesList.map((s) => [s.id, s]));
 const data = { speciesList, speciesById, palette, recipes };
 let feasting = false; // 나눠 먹는 중에는 또 상을 차리지 않아요
 const animator = createAnimator(friends); // 농부(바쁘면 친구들이 도우러 와요), 드론, 스프링클러, 물길 연출
+const cat = createCat(); // 헛간 옆 고양이
 data.isPending = (plotId) => animator.isPending(plotId);
 
 const game = {
@@ -83,9 +88,21 @@ function setIdleMode(on) {
   fitScreen();
 }
 
+let idleSteps = 0;
+let lastFeastAt = 0;
+
 function idleStep() {
-  if (!idleMode || busy || document.hidden || animator.pendingCount() >= IDLE_MAX_JOBS) return;
+  // 밤 10시 ~ 새벽 5시에는 다들 쉬어요 (쿨쿨)
+  const resting = idleMode && isRestTime(game.state.meta.gameMinutes);
+  animator.setResting(resting);
+  if (!idleMode || resting || busy || document.hidden || animator.pendingCount() >= IDLE_MAX_JOBS) return;
+  idleSteps += 1;
   const task = nextTask(game.state, speciesList, (id) => animator.isPending(id));
+  // 부엌일은 가끔: 밭일이 없을 때, 또는 다섯 번에 한 번
+  if (!task || idleSteps % 5 === 0) {
+    const kitchen = nextKitchenTask(game.state, recipes, { feasting, msSinceFeast: performance.now() - lastFeastAt });
+    if (kitchen) return actions[kitchen.kind](kitchen.recipeId, { quiet: true });
+  }
   if (task) sendWorker(task.plot, task, { quiet: true });
 }
 
@@ -121,8 +138,9 @@ function record(action, detail = "", actor = "player") {
 }
 
 // 규칙 함수의 결과({ ok, message })를 알림으로 보여 주고, 성공했으면 기록하고 효과음을 냅니다.
-function report(result, action, detail, sound, actor = "player") {
-  showToast(result.message);
+//   quiet: 멍때리기 모드처럼 알림 글은 띄우지 않고 소리와 기록만
+function report(result, action, detail, sound, actor = "player", quiet = false) {
+  if (!quiet) showToast(result.message);
   if (result.ok) {
     record(action, detail, actor);
     if (sound) playSound(sound);
@@ -212,34 +230,42 @@ const actions = {
     report({ ok: count > 0, message: count ? `${PLOT_NAMES[plot.kind]} ${count}칸의 테두리를 바꿨어요` : "이미 모두 같은 색이에요" }, "decor", `${plot.kind}:${plot.border}`);
   },
   // 요리: 재료를 꺼내 두고, 농부가 화덕에 가서 보글보글 끓이면 창고에 요리가 들어가요.
-  cook(recipeId) {
+  cook(recipeId, { quiet = false } = {}) {
     const recipe = recipes.find((r) => r.id === recipeId);
     const started = startCooking(game.state, recipe);
-    if (!started.ok) return report(started);
+    if (!started.ok) return report(started, "cook", recipe.id, null, "player", quiet);
     const spot = { x: layout.kitchen.x - 2 - layout.farm.x, y: layout.kitchen.y + 15 - layout.farm.y };
     animator.cook(spot, (worker) => {
       const result = finishCooking(game.state, recipe);
       const who = worker.name ? `${josa(worker.name, "이가", "가")} ` : "";
-      report({ ...result, message: `${who}${result.message}` }, "cook", recipe.id, "cook", worker.name ?? "player");
+      report({ ...result, message: `${who}${result.message}` }, "cook", recipe.id, "cook", worker.name ?? "player", quiet);
     });
-    showToast(started.message);
+    if (!quiet) showToast(started.message);
     draw();
   },
-  // 나눠 먹기: 농부와 친구들이 돗자리에 둘러앉아 맛있게 먹어요
-  share(recipeId) {
-    if (feasting) return report({ ok: false, message: "지금 다 같이 먹고 있어요. 다 먹으면 또 차려 주세요" });
+  // 나눠 먹기: 농부와 친구들이 돗자리에 둘러앉아 맛있게 먹어요. 제일 좋아하는 요리면 머리 위에 ★
+  share(recipeId, { quiet = false } = {}) {
+    if (feasting) return report({ ok: false, message: "지금 다 같이 먹고 있어요. 다 먹으면 또 차려 주세요" }, "share", "", null, "player", quiet);
     const recipe = recipes.find((r) => r.id === recipeId);
     const result = share(game.state, recipe);
-    if (!result.ok) return report(result);
+    if (!result.ok) return report(result, "share", recipe.id, null, "player", quiet);
     feasting = true;
     const { center, seats } = picnicSeats(layout.picnic);
     const rel = (p) => ({ ...p, x: p.x - layout.farm.x, y: p.y - layout.farm.y });
+    const fans = new Set(fansOf(recipe, friends).map((f) => f.id));
     playSound("call");
-    animator.feast(seats.map(rel), recipe.id, rel(center), () => {
-      feasting = false;
-      report(result, "share", recipe.id, "yum");
-    });
-    showToast("다들 모여라~ 맛있는 거 먹자!");
+    animator.feast(
+      seats.map(rel),
+      recipe.id,
+      rel(center),
+      () => {
+        feasting = false;
+        lastFeastAt = performance.now();
+        report({ ...result, message: shareMessage(recipe, friends) }, "share", recipe.id, "yum", "player", quiet);
+      },
+      fans,
+    );
+    if (!quiet) showToast("다들 모여라~ 맛있는 거 먹자!");
     draw();
   },
   setTimeScale(scale) {
@@ -304,6 +330,7 @@ async function catchUp(fromMs, toMs) {
   }
   game.log.push(...reportToLog(away, game.state.meta.gameMinutes, friends));
   lastTick = toMs;
+  lastWeather = weatherAt(game.state.meta.gameMinutes, farmSeed(game.state)); // 비운 사이 바뀐 날씨는 알림 없이
   draw();
   await save({ silent: true }); // 처리한 결과를 바로 저장
   if (!notice) {
@@ -329,8 +356,32 @@ async function tick() {
   lastTick = now;
   advanceFarm(game.state, speciesById, realMsToGameMinutes(elapsed, game.state.meta.timeScale));
   if (!idleMode) game.state.meta.playSeconds += elapsed / 1000; // 직접 플레이한 시간 (멍때리기는 빼요)
+  noticeWeather();
   draw();
 }
+
+// 비가 오기 시작하거나 무지개가 뜨면 살짝 알려 줘요
+const WEATHER_NEWS = {
+  rain: "비가 내리기 시작했어요. 작물들이 촉촉해져요 ☔",
+  snow: "눈이 소복소복 내려요 ❄",
+  rainbow: "비가 그치고 무지개가 떴어요 🌈",
+};
+let lastWeather = weatherAt(game.state.meta.gameMinutes, farmSeed(game.state));
+
+function noticeWeather() {
+  const weather = weatherAt(game.state.meta.gameMinutes, farmSeed(game.state));
+  if (weather === lastWeather) return;
+  lastWeather = weather;
+  if (!WEATHER_NEWS[weather]) return;
+  if (!idleMode) showToast(WEATHER_NEWS[weather]);
+  playSound("weather");
+}
+
+// 자연의 소리가 지금이 밤인지, 비가 오는지, 무슨 계절인지 알 수 있게
+setNatureEnv(() => {
+  const minutes = game.state.meta.gameMinutes;
+  return { night: lightAt(minutes).night, raining: weatherAt(minutes, farmSeed(game.state)) === "rain", season: seasonOf(minutes).id };
+});
 
 // 패널은 보이는 내용이 바뀔 때만 다시 만듭니다. 매초 다시 만들면 누르던 버튼이 사라질 수 있어요.
 let panelKey = "";
@@ -359,7 +410,7 @@ function animate(time) {
   if (time - lastFrame >= FRAME_MS) {
     lastFrame = time;
     animator.update(time);
-    drawFarm(ctx, { ...data, layout, sprites, animator, state: game.state, selectedId: game.selectedId, preview: game.preview, time });
+    drawFarm(ctx, { ...data, layout, sprites, animator, cat, state: game.state, selectedId: game.selectedId, preview: game.preview, time });
   }
   requestAnimationFrame(animate);
 }
@@ -368,6 +419,13 @@ canvas.addEventListener("click", (event) => {
   const rect = canvas.getBoundingClientRect();
   const x = ((event.clientX - rect.left) * canvas.width) / rect.width;
   const y = ((event.clientY - rect.top) * canvas.height) / rect.height;
+  // 고양이를 누르면 쓰다듬어 줘요 (가르릉 ♥)
+  const c = catRect(layout);
+  if (x >= c.x && x < c.x + c.w && y >= c.y && y < c.y + c.h) {
+    petCat(cat, performance.now());
+    playSound("purr");
+    return;
+  }
   game.selectedId = plotAt(game.state.plots, x - layout.farm.x, y - layout.farm.y)?.id ?? null;
   game.preview = null;
   draw();
