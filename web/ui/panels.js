@@ -5,7 +5,7 @@ import { PLOT_FOR_TYPE, WATER_RANGE, stageOf } from "../farm/crops.js";
 import { seedId } from "../farm/harvest.js";
 import { itemCount } from "../state.js";
 import { PLOT_NAMES, STAGE_NAMES } from "../text.js";
-import { formatGameTime } from "../time/clock.js";
+import { formatGameTime, TIME_SCALES } from "../time/clock.js";
 import { el } from "./dom.js";
 
 export function renderHeader(game) {
@@ -30,6 +30,19 @@ export function renderPanel(root, game, speciesList, speciesById, actions) {
       Object.entries(BULK).map(([kind, { label }]) => el("button", { onclick: () => actions.bulk(kind) }, label)),
     ),
     el("section", { class: "card" }, el("h2", {}, "창고"), inventoryList(game.state, speciesById)),
+    el(
+      "section",
+      { class: "card" },
+      el("h2", {}, "설정"),
+      el("p", { class: "hint" }, "시간 배율: 현실 1분이 게임 속 몇 분인지"),
+      TIME_SCALES.map((scale) =>
+        el(
+          "button",
+          { class: scale === game.state.meta.timeScale ? "selected" : "", onclick: () => actions.setTimeScale(scale) },
+          `×${scale}`,
+        ),
+      ),
+    ),
   );
 }
 

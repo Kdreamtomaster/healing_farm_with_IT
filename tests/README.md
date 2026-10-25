@@ -34,6 +34,7 @@ python -m unittest discover -s tests/server -t tests/server
 | `server/test_integrity.py` | 지문 계산, 세이브 직접 수정 감지와 저장 잠금, 키 삭제 감지 |
 | `server/test_api.py` | 경로 조작 차단, 입력 검증, 다른 웹사이트 요청 차단, 저장 왕복 |
 | `web/farm.test.js` | 성장, 수분, 시듦, 심기, 수확, 일괄 관리 |
+| `web/time.test.js` | 비운 시간 0·음수·5일 초과, 배율, 친구들의 물주기·수확, 나눠 처리해도 같은 결과, 안내 문장 |
 | `web/index.html`, `web/runner.js` | 브라우저용 작은 테스트 도구 |
 
 서버 테스트는 실제 `saves/` 대신 임시 폴더(`…/내 게임/힐링 농장/`)를 써서 내 세이브를 건드리지 않아요.

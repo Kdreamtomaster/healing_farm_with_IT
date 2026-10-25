@@ -3,6 +3,9 @@
 
 export const MINUTES_PER_DAY = 24 * 60;
 
+// 설정 화면에서 고를 수 있는 배율
+export const TIME_SCALES = [1, 10, 30, 60];
+
 export function realMsToGameMinutes(ms, timeScale) {
   return (ms / 60000) * timeScale;
 }

@@ -17,6 +17,8 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+  word-break: keep-all; /* 한글 낱말이 중간에서 끊기지 않게 */
+  overflow-wrap: anywhere;
 }
 
 header {
@@ -166,4 +168,54 @@ button:disabled {
 
 #toast.show {
   opacity: 1;
+}
+
+#loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(246, 239, 226, 0.94);
+}
+
+#loading[hidden] {
+  display: none;
+}
+
+.loading-box {
+  width: min(440px, calc(100% - 32px));
+  background: var(--card);
+  border: 3px solid #7a5a3a;
+  border-radius: 8px;
+  padding: 20px 24px;
+}
+
+.loading-box h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.progress {
+  height: 12px;
+  background: #eadfcb;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+#loading-bar {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+}
+
+#loading-lines {
+  margin: 0 0 8px;
+  padding-left: 20px;
+  line-height: 1.7;
+}
+
+button.selected {
+  background: var(--accent-dark);
+  outline: 2px solid #f3d36b;
 }
