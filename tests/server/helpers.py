@@ -12,12 +12,13 @@ NOW = 1_700_000_000_000  # 테스트용 고정 시각(ms)
 
 
 class TempFarm:
-    """한글과 공백이 들어간 임시 폴더에 data/ 를 복사해 둔 테스트용 농장."""
+    """한글과 공백이 들어간 임시 폴더에 data/, assets/ 를 복사해 둔 테스트용 농장."""
 
     def __enter__(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.root = Path(self._tmp.name) / "내 게임" / "힐링 농장"
         shutil.copytree(ROOT / "data", self.root / "data")
+        shutil.copytree(ROOT / "assets", self.root / "assets")
         self.saves = self.root / "saves"
         return self
 
@@ -30,6 +31,12 @@ class TempFarm:
         store = FarmStore(self.saves, self.root / "data")
         store.open(NOW)
         return store
+
+
+def rules():
+    from validation import load_rules
+
+    return load_rules(ROOT)
 
 
 def save_request(state: dict, log=None) -> dict:

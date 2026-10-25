@@ -13,13 +13,13 @@
 ## 게임 속에서는
 | 역할 | 폴더 |
 |---|---|
-| 보여 주기 | `web/ui/`, `assets/` |
+| 보여 주기·들려주기 | `web/ui/`, `web/sound/`, `assets/` |
 | 규칙 계산 | `web/farm/`, `web/time/`, `web/friends/`, `web/smartfarm/`, `web/lab/` |
 | 저장하기 | `server/storage/`, `server/integrity/`, `saves/` |
 | 기본 정보 | `data/` |
 | 확인하기 | `tests/` |
 
-화면에 토마토가 보이기까지: `data/crops.json`(토마토 정보) → `web/farm/`(지금 몇 단계?) → `web/ui/`(어느 그림을 그릴까?) → `assets/crops/tomato_3.png`
+화면에 토마토가 보이기까지: `data/crops.json`(토마토 정보) → `web/farm/`(지금 몇 단계?) → `web/ui/`(어느 그림을 그릴까?) → `assets/crops/tomato_ripe_1.png`
 
 ## 실제 제품에서는
 큰 서비스는 수백 명이 함께 코드를 고쳐요. 폴더 구조가 곧 **"누가 무엇을 책임지는지"의 지도**가 됩니다.

@@ -1,8 +1,11 @@
 // 게임 시작점: 데이터와 세이브를 불러와 비운 시간을 처리하고, 1초마다 농장의 시간을 흘려보냅니다.
-import { loadFriends, loadSpecies, loadState, saveState } from "./api.js";
+import { loadFriends, loadManifest, loadPalette, loadSpecies, loadState, saveState } from "./api.js";
+import { applyBorderToKind, setBorder } from "./decor/plots-style.js";
 import { bulkCare, BULK, flood, water } from "./farm/care.js";
 import { advanceFarm } from "./farm/crops.js";
 import { clearWithered, harvest, plant } from "./farm/harvest.js";
+import { playSound, setSound, unlockAudio } from "./sound/engine.js";
+import { PLOT_NAMES } from "./text.js";
 import { startAutosave } from "./time/autosave.js";
 import { MINUTES_PER_DAY, realMsToGameMinutes } from "./time/clock.js";
 import { newReport, planOffline, simulateOffline } from "./time/offline.js";
@@ -10,6 +13,7 @@ import { reportToLog, summarize } from "./time/summary.js";
 import { hideLoading, showProgress, showSummary } from "./ui/loading.js";
 import { renderHeader, renderPanel } from "./ui/panels.js";
 import { drawFarm, farmSize, plotAt, ZOOM } from "./ui/renderer.js";
+import { loadSprites } from "./ui/sprites.js";
 import { showToast } from "./ui/toast.js";
 
 // 이만큼 넘게 시간이 비면(컴퓨터 잠자기 등) 플레이 중이 아니라 "비운 시간"으로 보고 친구들이 돌봐요.
@@ -17,18 +21,28 @@ const AWAY_GAP_MS = 2 * 60 * 1000;
 // 이보다 짧게 비운 건 안내 화면을 띄우지 않아요.
 const AWAY_NOTICE_MS = 60 * 1000;
 const MAX_LOG_PER_SAVE = 500; // 서버가 한 번에 받는 작업 기록 수
+const FRAME_MS = 1000 / 12; // 도트 게임답게 1초에 12번만 다시 그려요
 
 const canvas = document.getElementById("farm");
 const ctx = canvas.getContext("2d");
 const panel = document.getElementById("panel");
 
-const [speciesList, friends, boot] = await Promise.all([loadSpecies(), loadFriends(), loadState()]);
+const [speciesList, friends, palette, manifest, boot] = await Promise.all([
+  loadSpecies(),
+  loadFriends(),
+  loadPalette(),
+  loadManifest(),
+  loadState(),
+]);
+const sprites = await loadSprites(manifest);
 const speciesById = new Map(speciesList.map((s) => [s.id, s]));
+const data = { speciesList, speciesById, palette };
 
 const game = {
   state: boot.state,
   integrity: boot.integrity,
   selectedId: null,
+  preview: null, // 심기 전 미리보기 { plotId, speciesId, colorId }
   log: [], // 아직 서버에 보내지 않은 작업 기록
 };
 
@@ -49,30 +63,37 @@ function record(action, detail = "", actor = "player") {
   game.log.push({ at: game.state.meta.gameMinutes, actor, action, detail });
 }
 
-// 규칙 함수의 결과({ ok, message })를 알림으로 보여 주고, 성공했으면 기록합니다.
-function report(result, action, detail) {
+// 규칙 함수의 결과({ ok, message })를 알림으로 보여 주고, 성공했으면 기록하고 효과음을 냅니다.
+function report(result, action, detail, sound) {
   showToast(result.message);
-  if (result.ok) record(action, detail);
+  if (result.ok) {
+    record(action, detail);
+    if (sound) playSound(sound);
+  }
   draw();
 }
 
 const actions = {
-  plant(speciesId) {
+  plant(speciesId, colorId) {
     const plot = selectedPlot();
-    report(plant(game.state, plot, speciesById.get(speciesId)), "plant", `${plot.id}:${speciesId}`);
+    game.preview = null;
+    report(plant(game.state, plot, speciesById.get(speciesId), colorId), "plant", `${plot.id}:${speciesId}:${colorId}`, "plant");
+  },
+  preview(speciesId, colorId) {
+    game.preview = speciesId ? { plotId: game.selectedId, speciesId, colorId } : null;
   },
   water() {
     const plot = selectedPlot();
-    report(water(plot) ? { ok: true, message: "물을 줬어요" } : { ok: false, message: "물을 줄 작물이 없어요" }, "water", `${plot.id}`);
+    report(water(plot) ? { ok: true, message: "물을 줬어요" } : { ok: false, message: "물을 줄 작물이 없어요" }, "water", `${plot.id}`, "water");
   },
   flood() {
     const plot = selectedPlot();
-    report(flood(plot) ? { ok: true, message: "논에 물을 가득 채웠어요" } : { ok: false, message: "물을 댈 수 없어요" }, "flood", `${plot.id}`);
+    report(flood(plot) ? { ok: true, message: "논에 물을 가득 채웠어요" } : { ok: false, message: "물을 댈 수 없어요" }, "flood", `${plot.id}`, "water");
   },
   harvest() {
     const plot = selectedPlot();
     const species = speciesById.get(plot.crop.species);
-    report(harvest(game.state, plot, species), "harvest", `${plot.id}:${species.id}`);
+    report(harvest(game.state, plot, species), "harvest", `${plot.id}:${species.id}`, "harvest");
   },
   clear() {
     const plot = selectedPlot();
@@ -81,12 +102,25 @@ const actions = {
   bulk(kind) {
     const count = bulkCare(game.state, speciesById, kind);
     const message = count ? `${BULK[kind].label}: ${count}칸` : `${BULK[kind].label}: 해당하는 칸이 없어요`;
-    report({ ok: count > 0, message }, `bulk:${kind}`, `${count}`);
+    report({ ok: count > 0, message }, `bulk:${kind}`, `${count}`, "water");
+  },
+  setBorder(borderId) {
+    const plot = selectedPlot();
+    if (setBorder(plot, borderId)) record("decor", `${plot.id}:${borderId}`);
+    draw();
+  },
+  borderToKind() {
+    const plot = selectedPlot();
+    const count = applyBorderToKind(game.state, plot.kind, plot.border);
+    report({ ok: count > 0, message: count ? `${PLOT_NAMES[plot.kind]} ${count}칸의 테두리를 바꿨어요` : "이미 모두 같은 색이에요" }, "decor", `${plot.kind}:${plot.border}`);
   },
   setTimeScale(scale) {
     tick(); // 지금까지는 이전 배율로 계산하고
     game.state.meta.timeScale = scale; // 지금부터 새 배율로
     report({ ok: true, message: `시간 배율을 ×${scale}로 바꿨어요` }, "time_scale", String(scale));
+  },
+  setSound(change) {
+    setSound(change);
   },
 };
 
@@ -98,7 +132,10 @@ async function save({ silent = false, keepalive = false } = {}) {
     const result = await saveState(game.state, sending, keepalive);
     if (result.ok) {
       game.state.meta.lastSavedAt = result.lastSavedAt;
-      if (!silent) showToast("저장했어요");
+      if (!silent) {
+        showToast("저장했어요");
+        playSound("save");
+      }
     } else {
       game.log.unshift(...sending);
       showToast(`저장하지 못했어요: ${result.error ?? result.status}`);
@@ -118,11 +155,13 @@ async function catchUp(fromMs, toMs) {
   const notice = plan.clockWentBack || plan.realMs >= AWAY_NOTICE_MS;
   if (plan.clockWentBack) record("clock_backwards", String(plan.realMs), "system");
   const away = newReport();
+  // 새로고침처럼 아주 잠깐 비운 건 친구들이 나서지 않아요. (다 자란 작물은 플레이어가 직접 수확하도록)
+  const helpers = notice ? friends : [];
   // 하루치(게임 시간)씩 나눠 처리하고, 그 사이에 진행 막대를 그려요. 한 번에 하면 화면이 멈춘 것처럼 보여요.
   let done = 0;
   while (done < plan.gameMinutes) {
     const slice = Math.min(MINUTES_PER_DAY, plan.gameMinutes - done);
-    simulateOffline(game.state, speciesById, friends, slice, away);
+    simulateOffline(game.state, speciesById, helpers, slice, away);
     done += slice;
     if (notice) {
       showProgress("친구들에게 농장 소식을 듣는 중…", done / plan.gameMinutes);
@@ -133,8 +172,14 @@ async function catchUp(fromMs, toMs) {
   lastTick = toMs;
   draw();
   await save({ silent: true }); // 처리한 결과를 바로 저장
-  if (notice) await showSummary(summarize(plan, away, speciesById, friends));
-  else hideLoading();
+  if (!notice) {
+    hideLoading();
+    return;
+  }
+  // 소리는 화면을 한 번 누른 뒤에만 낼 수 있어서, 아직 못 냈으면 "농장으로" 버튼을 누를 때 인사해요
+  const greeted = playSound("welcome");
+  await showSummary(summarize(plan, away, speciesById, friends));
+  if (!greeted) playSound("welcome");
 }
 
 async function tick() {
@@ -157,19 +202,30 @@ async function tick() {
 let panelKey = "";
 
 function draw() {
-  drawFarm(ctx, game.state, speciesById, game.selectedId);
-  renderHeader(game);
-  const crop = selectedPlot()?.crop;
+  renderHeader(game, palette);
+  const plot = selectedPlot();
+  const crop = plot?.crop;
   const key = JSON.stringify([
     game.selectedId,
+    plot?.border,
     crop && [crop.species, crop.withered, Math.floor(crop.progress * 100), Math.round(crop.moisture)],
     game.state.inventory,
     game.state.meta.timeScale,
   ]);
   if (key !== panelKey) {
     panelKey = key;
-    renderPanel(panel, game, speciesList, speciesById, actions);
+    renderPanel(panel, game, data, actions);
   }
+}
+
+// 농장 그림은 따로, 1초에 12번 다시 그려요 (흔들리는 작물, 계절 효과)
+let lastFrame = 0;
+function animate(time) {
+  if (time - lastFrame >= FRAME_MS) {
+    lastFrame = time;
+    drawFarm(ctx, { ...data, sprites, state: game.state, selectedId: game.selectedId, preview: game.preview, time });
+  }
+  requestAnimationFrame(animate);
 }
 
 canvas.addEventListener("click", (event) => {
@@ -177,15 +233,20 @@ canvas.addEventListener("click", (event) => {
   const x = ((event.clientX - rect.left) * canvas.width) / rect.width;
   const y = ((event.clientY - rect.top) * canvas.height) / rect.height;
   game.selectedId = plotAt(game.state.plots, x, y)?.id ?? null;
+  game.preview = null;
   draw();
 });
 document.getElementById("save-btn").addEventListener("click", () => save());
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) tick(); // 돌아오자마자 비운 시간 처리
 });
+// 첫 클릭·키 입력 때 소리 장치를 준비해요 (브라우저 규칙)
+window.addEventListener("pointerdown", unlockAudio);
+window.addEventListener("keydown", unlockAudio);
 
 // ── 시작 ──
 draw();
+requestAnimationFrame(animate);
 if (boot.recovery) {
   showToast(
     boot.recovery.restoredFrom

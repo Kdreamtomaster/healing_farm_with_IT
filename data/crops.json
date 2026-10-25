@@ -8,7 +8,10 @@
       "growMinutes": 240,
       "yield": 3,
       "seeds": 2,
-      "colors": ["#d9483b"]
+      "colors": [
+        { "id": "red", "name": "빨강", "hex": "#d9483b" },
+        { "id": "yellow", "name": "노랑", "hex": "#f0b43a" }
+      ]
     },
     {
       "id": "potato",
@@ -18,7 +21,10 @@
       "growMinutes": 180,
       "yield": 4,
       "seeds": 2,
-      "colors": ["#c9a25e"]
+      "colors": [
+        { "id": "gold", "name": "황금", "hex": "#c9a25e" },
+        { "id": "purple", "name": "보라", "hex": "#8a5a8a" }
+      ]
     },
     {
       "id": "rice",
@@ -28,7 +34,9 @@
       "growMinutes": 360,
       "yield": 5,
       "seeds": 2,
-      "colors": ["#e8c84a"]
+      "colors": [
+        { "id": "gold", "name": "황금", "hex": "#e8c84a" }
+      ]
     },
     {
       "id": "tulip",
@@ -38,7 +46,12 @@
       "growMinutes": 120,
       "yield": 1,
       "seeds": 2,
-      "colors": ["#e86f9a"]
+      "colors": [
+        { "id": "pink", "name": "분홍", "hex": "#e86f9a" },
+        { "id": "yellow", "name": "노랑", "hex": "#f4d04a" },
+        { "id": "purple", "name": "보라", "hex": "#a36fd6" },
+        { "id": "white", "name": "하양", "hex": "#f2f0e8" }
+      ]
     }
   ]
 }

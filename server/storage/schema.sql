@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS plots (
     id   INTEGER PRIMARY KEY,
     x    INTEGER NOT NULL,
     y    INTEGER NOT NULL,
-    kind TEXT    NOT NULL           -- field(밭) / paddy(논) / flowerbed(화단)
+    kind TEXT    NOT NULL,          -- field(밭) / paddy(논) / flowerbed(화단)
+    border TEXT  NOT NULL DEFAULT '' -- 테두리 색 (assets/palette.json 의 borders id)
 );
 
 -- 구획에 심은 작물. 구획 하나에 작물은 하나만 심을 수 있습니다.
@@ -23,7 +24,8 @@ CREATE TABLE IF NOT EXISTS crops (
     progress     REAL    NOT NULL,  -- 0 ~ 1, 1이면 다 자람
     moisture     REAL    NOT NULL,  -- 흙의 수분 0 ~ 100
     ripe_minutes REAL    NOT NULL,  -- 다 자란 뒤 지난 게임 시간(분)
-    withered     INTEGER NOT NULL   -- 1이면 시듦
+    withered     INTEGER NOT NULL,  -- 1이면 시듦
+    color        TEXT    NOT NULL DEFAULT ''  -- 열매·꽃 색 (data/crops.json 의 colors id)
 );
 
 -- 창고. seed_tomato(토마토 씨앗), tomato(토마토) 같은 물건과 개수.

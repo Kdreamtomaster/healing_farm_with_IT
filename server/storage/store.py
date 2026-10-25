@@ -3,7 +3,8 @@
 실행 시 순서:
     1. 파일이 깨졌으면(파일 손상) → 최근 정상 스냅샷으로 복구
     2. 파일이 없으면 → 새 농장 만들기
-    3. 지문(해시) 검증 → 맞지 않으면(변조) 저장을 잠금
+    3. 옛 버전 세이브면 → 새 표 구조로 옮기기 (마이그레이션)
+    4. 지문(해시) 검증 → 맞지 않으면(변조) 저장을 잠금
        (메뚜기 떼와 완전 초기화는 7단계에서 구현합니다)
 """
 
@@ -14,7 +15,7 @@ from contextlib import closing
 from pathlib import Path
 
 from integrity import hashing, verify
-from storage import backup, db
+from storage import backup, db, migrations
 
 
 class SaveLocked(Exception):
@@ -48,6 +49,7 @@ class FarmStore:
             if not self.db_path.exists():
                 self._new_farm(now)
             with closing(db.connect(self.db_path)) as conn:
+                self._migrate(conn)
                 db.set_meta(conn, "lastLaunchAt", now)
                 state = db.read_state(conn)
                 stored = db.read_digest(conn)
@@ -77,6 +79,34 @@ class FarmStore:
                     raise
                 backup.snapshot(conn, self.backups_dir, now)
         return {"lastSavedAt": now}
+
+    def _migrate(self, conn) -> None:
+        """옛 버전 세이브면 새 표 구조로 옮깁니다.
+
+        옮기기 전에 지문을 먼저 확인합니다. 정상이던 세이브만 새 지문을 받고,
+        변조된 세이브는 옮긴 뒤에도 지문이 맞지 않아 그대로 "변조"로 남습니다.
+        """
+        version = db.get_meta(conn, "schemaVersion", 1)
+        if version > db.SCHEMA_VERSION:
+            raise RuntimeError("이 세이브는 더 새로운 버전의 게임에서 만들어졌어요. 게임을 업데이트해 주세요.")
+        if version == db.SCHEMA_VERSION:
+            return
+        was_ok = verify.check(db.read_state(conn), db.read_digest(conn), self._key) == verify.OK
+        conn.execute("BEGIN")
+        try:
+            migrations.upgrade(conn, version, self._game_data())
+            if was_ok:
+                db.write_digest(conn, hashing.ALGO, hashing.digest(db.read_state(conn), self._key))
+            conn.execute("COMMIT")
+        except BaseException:
+            conn.execute("ROLLBACK")
+            raise
+
+    def _game_data(self) -> dict:
+        def read(name):
+            return json.loads((self.data_dir / name).read_text(encoding="utf-8"))
+
+        return {"start": read("start.json"), "crops": read("crops.json")["crops"]}
 
     def _new_farm(self, now: int) -> None:
         """새 농장은 임시 파일에 다 만든 뒤 이름을 바꿔 넣습니다.

@@ -3,12 +3,12 @@
 import sqlite3
 import unittest
 
-from helpers import NOW, TempFarm, save_request
+from helpers import NOW, TempFarm, rules, save_request
 
 from storage.store import LayoutMismatch
 from validation import validate_save
 
-SPECIES = {"tomato", "potato", "rice", "tulip"}
+RULES = rules()
 
 
 def planted_state(store):
@@ -20,7 +20,9 @@ def planted_state(store):
         "moisture": 62.5,
         "ripeMinutes": 0,
         "withered": False,
+        "color": "yellow",
     }
+    state["plots"][0]["border"] = "rose"
     state["inventory"]["seed_tomato"] = 3
     state["meta"]["gameMinutes"] = 42.5
     return state
@@ -39,11 +41,12 @@ class StorageTest(unittest.TestCase):
         with TempFarm() as farm:
             store = farm.store()
             state = planted_state(store)
-            store.save(validate_save(save_request(state), SPECIES), NOW + 1000)
+            store.save(validate_save(save_request(state), RULES), NOW + 1000)
 
             reopened = farm.store().load()  # 서버를 껐다 켠 것과 같음
             self.assertEqual(reopened["integrity"], "ok")
             self.assertEqual(reopened["state"]["plots"][0]["crop"], state["plots"][0]["crop"])
+            self.assertEqual(reopened["state"]["plots"][0]["border"], "rose")
             self.assertEqual(reopened["state"]["inventory"]["seed_tomato"], 3)
             self.assertEqual(reopened["state"]["meta"]["gameMinutes"], 42.5)
             self.assertEqual(reopened["state"]["meta"]["lastSavedAt"], NOW + 1000)
@@ -52,7 +55,7 @@ class StorageTest(unittest.TestCase):
         with TempFarm() as farm:
             store = farm.store()
             log = [{"at": 1, "actor": "player", "action": "plant", "detail": "0:tomato"}]
-            store.save(validate_save(save_request(planted_state(store), log), SPECIES), NOW)
+            store.save(validate_save(save_request(planted_state(store), log), RULES), NOW)
             with sqlite3.connect(str(farm.saves / "farm.sqlite")) as conn:
                 rows = conn.execute("SELECT actor, action FROM task_log").fetchall()
             self.assertEqual(rows, [("player", "plant")])
@@ -63,13 +66,13 @@ class StorageTest(unittest.TestCase):
             state = store.load()["state"]
             state["plots"][0]["kind"] = "paddy"
             with self.assertRaises(LayoutMismatch):
-                store.save(validate_save(save_request(state), SPECIES), NOW)
+                store.save(validate_save(save_request(state), RULES), NOW)
 
     def test_broken_file_is_restored_from_backup(self):
         with TempFarm() as farm:
             store = farm.store()
             state = planted_state(store)
-            store.save(validate_save(save_request(state), SPECIES), NOW + 1000)
+            store.save(validate_save(save_request(state), RULES), NOW + 1000)
             for suffix in ("-wal", "-shm"):
                 (farm.saves / f"farm.sqlite{suffix}").unlink(missing_ok=True)
             (farm.saves / "farm.sqlite").write_bytes(b"this is not a database")
@@ -97,7 +100,7 @@ class StorageTest(unittest.TestCase):
             store = farm.store()
             state = planted_state(store)
             for i in range(8):
-                store.save(validate_save(save_request(state), SPECIES), NOW + i * 1000)
+                store.save(validate_save(save_request(state), RULES), NOW + i * 1000)
             self.assertEqual(len(list((farm.saves / "backups").glob("farm-*.sqlite"))), 5)
 
 

@@ -3,13 +3,13 @@
 import sqlite3
 import unittest
 
-from helpers import NOW, TempFarm, save_request
+from helpers import NOW, TempFarm, rules, save_request
 
 from integrity import hashing
 from storage.store import SaveLocked
 from validation import validate_save
 
-SPECIES = {"tomato", "potato", "rice", "tulip"}
+RULES = rules()
 KEY = b"k" * 32
 
 
@@ -45,7 +45,7 @@ class TamperTest(unittest.TestCase):
             self.assertEqual(store.integrity, "tampered")
             self.assertIsNone(store.recovery)  # 변조는 파일 손상이 아니므로 복구하지 않음
             with self.assertRaises(SaveLocked):
-                store.save(validate_save(save_request(store.load()["state"]), SPECIES), NOW)
+                store.save(validate_save(save_request(store.load()["state"]), RULES), NOW)
 
     def test_deleting_key_is_detected(self):
         with TempFarm() as farm:

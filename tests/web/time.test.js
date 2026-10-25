@@ -7,8 +7,8 @@ import { assert, assertNear, test } from "./runner.js";
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
 
-const TOMATO = { id: "tomato", name: { ko: "토마토" }, type: "field", water: "high", growMinutes: 240, yield: 3, seeds: 2, colors: ["#f00"] };
-const RICE = { id: "rice", name: { ko: "벼" }, type: "paddy", water: "high", growMinutes: 360, yield: 5, seeds: 2, colors: ["#ff0"] };
+const TOMATO = { id: "tomato", name: { ko: "토마토" }, type: "field", water: "high", growMinutes: 240, yield: 3, seeds: 2, colors: [{ id: "red", name: "빨강", hex: "#f00" }] };
+const RICE = { id: "rice", name: { ko: "벼" }, type: "paddy", water: "high", growMinutes: 360, yield: 5, seeds: 2, colors: [{ id: "gold", name: "황금", hex: "#ff0" }] };
 const speciesById = new Map([TOMATO, RICE].map((s) => [s.id, s]));
 const FRIENDS = [
   { id: "haneul", name: "하늘", plots: ["field"] },
@@ -16,7 +16,7 @@ const FRIENDS = [
 ];
 
 function farm() {
-  const crop = (species) => ({ species, plantedAt: 0, progress: 0, moisture: 40, ripeMinutes: 0, withered: false });
+  const crop = (species) => ({ species, plantedAt: 0, progress: 0, moisture: 40, ripeMinutes: 0, withered: false, color: species === "rice" ? "gold" : "red" });
   return {
     meta: { gameMinutes: 0, playSeconds: 0, timeScale: 30 },
     plots: [

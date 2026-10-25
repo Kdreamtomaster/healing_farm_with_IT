@@ -14,6 +14,14 @@ export async function loadFriends() {
   return (await getJson("/data/friends.json", "친구 데이터")).friends;
 }
 
+export function loadPalette() {
+  return getJson("/assets/palette.json", "색 팔레트");
+}
+
+export function loadManifest() {
+  return getJson("/assets/manifest.json", "그림 목록");
+}
+
 export function loadState() {
   return getJson("/api/state", "세이브");
 }

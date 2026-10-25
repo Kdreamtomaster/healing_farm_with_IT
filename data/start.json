@@ -7,6 +7,7 @@
     "BBBBBBBB"
   ],
   "legend": { "F": "field", "P": "paddy", "B": "flowerbed" },
+  "borders": { "field": "oak", "paddy": "stream", "flowerbed": "bark" },
   "inventory": {
     "seed_tomato": 4,
     "seed_potato": 4,

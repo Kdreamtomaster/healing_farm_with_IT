@@ -5,11 +5,11 @@ import { clearWithered, harvest, plant } from "../../web/farm/harvest.js";
 import { assert, assertNear, test } from "./runner.js";
 
 // 테스트용 작물: 계산하기 쉽게 10분 만에 다 자라도록
-const SPROUTY = { id: "sprouty", name: { ko: "새싹이" }, type: "field", water: "low", growMinutes: 10, yield: 3, seeds: 2, colors: ["#ff0000"] };
-const RICE = { id: "rice", name: { ko: "벼" }, type: "paddy", water: "high", growMinutes: 10, yield: 5, seeds: 2, colors: ["#ffff00"] };
+const SPROUTY = { id: "sprouty", name: { ko: "새싹이" }, type: "field", water: "low", growMinutes: 10, yield: 3, seeds: 2, colors: [{ id: "red", name: "빨강", hex: "#ff0000" }] };
+const RICE = { id: "rice", name: { ko: "벼" }, type: "paddy", water: "high", growMinutes: 10, yield: 5, seeds: 2, colors: [{ id: "gold", name: "황금", hex: "#ffff00" }] };
 const speciesById = new Map([SPROUTY, RICE].map((s) => [s.id, s]));
 
-const crop = (fields = {}) => ({ species: "sprouty", plantedAt: 0, progress: 0, moisture: 50, ripeMinutes: 0, withered: false, ...fields });
+const crop = (fields = {}) => ({ species: "sprouty", plantedAt: 0, progress: 0, moisture: 50, ripeMinutes: 0, withered: false, color: "red", ...fields });
 
 function newState() {
   return {

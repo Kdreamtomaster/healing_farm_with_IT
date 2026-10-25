@@ -5,12 +5,12 @@ import json
 import threading
 import unittest
 
-from helpers import ROOT, TempFarm, save_request
+from helpers import ROOT, TempFarm, rules, save_request
 
 from api import make_server, resolve_static
 from validation import ValidationError, validate_save
 
-SPECIES = {"tomato", "potato", "rice", "tulip"}
+RULES = rules()
 
 
 class StaticPathTest(unittest.TestCase):
@@ -31,17 +31,17 @@ class ValidationTest(unittest.TestCase):
     def state(self):
         return {
             "meta": {"gameMinutes": 0, "playSeconds": 0, "timeScale": 30},
-            "plots": [{"id": 0, "x": 0, "y": 0, "kind": "field", "crop": None}],
+            "plots": [{"id": 0, "x": 0, "y": 0, "kind": "field", "border": "oak", "crop": None}],
             "inventory": {"seed_tomato": 1},
         }
 
     def test_valid_request(self):
-        game = validate_save(save_request(self.state()), SPECIES)
+        game = validate_save(save_request(self.state()), RULES)
         self.assertEqual(game["layout"], [(0, 0, 0, "field")])
 
     def assert_rejected(self, state):
         with self.assertRaises(ValidationError):
-            validate_save(save_request(state), SPECIES)
+            validate_save(save_request(state), RULES)
 
     def test_rejects_negative_count(self):
         state = self.state()
@@ -57,7 +57,21 @@ class ValidationTest(unittest.TestCase):
         state = self.state()
         state["plots"][0]["crop"] = {
             "species": "gold", "plantedAt": 0, "progress": 0, "moisture": 0, "ripeMinutes": 0, "withered": False,
+            "color": "red",
         }
+        self.assert_rejected(state)
+
+    def test_rejects_color_the_crop_does_not_have(self):
+        state = self.state()
+        state["plots"][0]["crop"] = {
+            "species": "rice", "plantedAt": 0, "progress": 0, "moisture": 0, "ripeMinutes": 0, "withered": False,
+            "color": "purple",
+        }
+        self.assert_rejected(state)
+
+    def test_rejects_unknown_border(self):
+        state = self.state()
+        state["plots"][0]["border"] = "#000000"
         self.assert_rejected(state)
 
     def test_rejects_not_finite(self):

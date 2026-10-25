@@ -1,0 +1,13 @@
+{
+  "recolor": {
+    "main": "#ff00ff",
+    "shade": "#b000b0"
+  },
+  "crops": {
+    "ids": ["tomato", "potato", "rice", "tulip"],
+    "frames": { "seed": 1, "sprout": 2, "growing": 2, "ripe": 2, "withered": 1 }
+  },
+  "effects": {
+    "drop": "effects/drop_1.png"
+  }
+}

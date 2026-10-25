@@ -8,7 +8,8 @@ import json
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+# 표 구조를 바꾸면 이 숫자를 올리고 migrations.py 에 옮기는 방법을 적어 주세요.
+SCHEMA_VERSION = 2
 SCHEMA_FILE = Path(__file__).with_name("schema.sql")
 REQUIRED_TABLES = {"meta", "plots", "crops", "inventory", "task_log", "integrity"}
 
@@ -52,8 +53,9 @@ def fill_new_farm(conn: sqlite3.Connection, start: dict, now: int) -> None:
     plots = []
     for y, row in enumerate(start["layout"]):
         for x, symbol in enumerate(row):
-            plots.append((len(plots), x, y, legend[symbol]))
-    conn.executemany("INSERT INTO plots (id, x, y, kind) VALUES (?, ?, ?, ?)", plots)
+            kind = legend[symbol]
+            plots.append((len(plots), x, y, kind, start["borders"][kind]))
+    conn.executemany("INSERT INTO plots (id, x, y, kind, border) VALUES (?, ?, ?, ?, ?)", plots)
     conn.executemany(
         "INSERT INTO inventory (item, count) VALUES (?, ?)",
         sorted(start["inventory"].items()),
@@ -77,26 +79,47 @@ def set_meta(conn: sqlite3.Connection, key: str, value) -> None:
     )
 
 
+def get_meta(conn: sqlite3.Connection, key: str, default=None):
+    row = conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
+    return json.loads(row[0]) if row else default
+
+
+def _columns(conn: sqlite3.Connection, table: str) -> set:
+    return {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+
+
 def read_state(conn: sqlite3.Connection) -> dict:
-    """표에 저장된 농장 상태를 브라우저가 쓰는 모양(dict)으로 읽어 옵니다."""
+    """표에 저장된 농장 상태를 브라우저가 쓰는 모양(dict)으로 읽어 옵니다.
+
+    옛 버전 세이브(색 칸이 없는 표)도 읽을 수 있어야 마이그레이션 전에 지문을 확인할 수 있어서,
+    있는 칸만 읽습니다.
+    """
+    has_color = "color" in _columns(conn, "crops")
+    has_border = "border" in _columns(conn, "plots")
     meta = {key: json.loads(value) for key, value in conn.execute("SELECT key, value FROM meta ORDER BY key")}
-    crops = {
-        plot_id: {
-            "species": species,
-            "plantedAt": planted_at,
-            "progress": progress,
-            "moisture": moisture,
-            "ripeMinutes": ripe_minutes,
-            "withered": bool(withered),
+    crops = {}
+    for row in conn.execute(
+        "SELECT plot_id, species, planted_at, progress, moisture, ripe_minutes, withered"
+        + (", color" if has_color else "")
+        + " FROM crops"
+    ):
+        crop = {
+            "species": row[1],
+            "plantedAt": row[2],
+            "progress": row[3],
+            "moisture": row[4],
+            "ripeMinutes": row[5],
+            "withered": bool(row[6]),
         }
-        for plot_id, species, planted_at, progress, moisture, ripe_minutes, withered in conn.execute(
-            "SELECT plot_id, species, planted_at, progress, moisture, ripe_minutes, withered FROM crops"
-        )
-    }
-    plots = [
-        {"id": plot_id, "x": x, "y": y, "kind": kind, "crop": crops.get(plot_id)}
-        for plot_id, x, y, kind in conn.execute("SELECT id, x, y, kind FROM plots ORDER BY id")
-    ]
+        if has_color:
+            crop["color"] = row[7]
+        crops[row[0]] = crop
+    plots = []
+    for row in conn.execute("SELECT id, x, y, kind" + (", border" if has_border else "") + " FROM plots ORDER BY id"):
+        plot = {"id": row[0], "x": row[1], "y": row[2], "kind": row[3], "crop": crops.get(row[0])}
+        if has_border:
+            plot["border"] = row[4]
+        plots.append(plot)
     inventory = dict(conn.execute("SELECT item, count FROM inventory ORDER BY item"))
     return {"meta": meta, "plots": plots, "inventory": inventory}
 
@@ -106,11 +129,12 @@ def read_layout(conn: sqlite3.Connection) -> list:
 
 
 def write_game(conn: sqlite3.Connection, game: dict, now: int) -> None:
-    """검증을 마친 저장 요청(game)을 표에 씁니다. 구획 배치(plots)는 바꾸지 않습니다."""
+    """검증을 마친 저장 요청(game)을 표에 씁니다. 구획 배치(위치, 종류)는 바꾸지 않습니다."""
+    conn.executemany("UPDATE plots SET border = ? WHERE id = ?", [(b, i) for i, b in sorted(game["borders"].items())])
     conn.execute("DELETE FROM crops")
     conn.executemany(
-        "INSERT INTO crops (plot_id, species, planted_at, progress, moisture, ripe_minutes, withered)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO crops (plot_id, species, planted_at, progress, moisture, ripe_minutes, withered, color)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (
                 plot_id,
@@ -120,6 +144,7 @@ def write_game(conn: sqlite3.Connection, game: dict, now: int) -> None:
                 crop["moisture"],
                 crop["ripeMinutes"],
                 int(crop["withered"]),
+                crop["color"],
             )
             for plot_id, crop in sorted(game["crops"].items())
         ],

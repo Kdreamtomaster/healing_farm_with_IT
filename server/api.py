@@ -48,7 +48,7 @@ def resolve_static(root: Path, url_path: str):
 
 
 def make_server(store: FarmStore, root: Path, port: int) -> ThreadingHTTPServer:
-    species_ids = {c["id"] for c in json.loads((root / "data" / "crops.json").read_text(encoding="utf-8"))["crops"]}
+    rules = validation.load_rules(root)
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -81,7 +81,7 @@ def make_server(store: FarmStore, root: Path, port: int) -> ThreadingHTTPServer:
             if length > MAX_BODY:
                 return self._send_json(413, {"error": "저장 요청이 너무 커요"})
             try:
-                game = validation.validate_save(json.loads(self.rfile.read(length) or b"null"), species_ids)
+                game = validation.validate_save(json.loads(self.rfile.read(length) or b"null"), rules)
                 return self._send_json(200, store.save(game, _now()))
             except (json.JSONDecodeError, validation.ValidationError, LayoutMismatch) as error:
                 return self._send_json(400, {"error": str(error) or "잘못된 저장 요청이에요"})

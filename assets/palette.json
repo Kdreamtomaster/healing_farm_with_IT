@@ -1,0 +1,23 @@
+{
+  "borders": [
+    { "id": "oak", "name": "참나무", "color": "#6b4a2b" },
+    { "id": "bark", "name": "나무껍질", "color": "#5a3b26" },
+    { "id": "stream", "name": "냇물", "color": "#3f5f66" },
+    { "id": "moss", "name": "이끼", "color": "#4f6b3a" },
+    { "id": "rose", "name": "장미", "color": "#9a4a5a" },
+    { "id": "sun", "name": "햇살", "color": "#b08a3a" },
+    { "id": "lilac", "name": "라일락", "color": "#6a5a8a" },
+    { "id": "cloud", "name": "구름", "color": "#d8d2c4" }
+  ],
+  "soil": {
+    "field": { "dry": "#d2a874", "wet": "#7d5434" },
+    "paddy": { "dry": "#a9bdb0", "wet": "#4d7a86" },
+    "flowerbed": { "dry": "#c49670", "wet": "#6e4630" }
+  },
+  "seasons": {
+    "spring": { "name": "봄", "page": "#f7eee6", "tint": "rgba(255, 190, 215, 0.07)", "particle": "#f5b8c8" },
+    "summer": { "name": "여름", "page": "#f1f3df", "tint": "rgba(255, 245, 170, 0.06)", "particle": "#fff3a0" },
+    "autumn": { "name": "가을", "page": "#f6eadb", "tint": "rgba(255, 160, 80, 0.10)", "particle": "#e08a3a" },
+    "winter": { "name": "겨울", "page": "#eef1f4", "tint": "rgba(200, 220, 255, 0.16)", "particle": "#ffffff" }
+  }
+}

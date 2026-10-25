@@ -2,25 +2,17 @@
 // 캔버스는 실제 픽셀 크기(칸 하나 16×16)로 그리고, CSS 로 4배 확대합니다.
 // (style.css 의 image-rendering: pixelated 덕분에 흐려지지 않아요)
 //
-// 아직 그림 파일(assets/) 대신 점을 하나하나 찍어 그립니다. 4단계에서 그림 파일로 바꿀 예정이에요.
+// scene = { state, speciesById, palette, sprites, selectedId, preview, time }
+//   time: 애니메이션용 시각(ms). 흔들리는 작물, 계절 효과가 이 값으로 움직여요.
+import { borderColor, cropColor, mixColors } from "../decor/palette.js";
+import { seasonOf } from "../decor/season.js";
 import { isThirsty, stageOf } from "../farm/crops.js";
 
 export const TILE = 16;
 export const ZOOM = 4;
-
-const COLORS = {
-  border: { field: "#6b4a2b", paddy: "#3f5f66", flowerbed: "#5a3b26" },
-  dry: { field: "#d2a874", paddy: "#a9bdb0", flowerbed: "#c49670" },
-  wet: { field: "#7d5434", paddy: "#4d7a86", flowerbed: "#6e4630" },
-  ripple: "#cfeaf2",
-  seed: "#4a2f1c",
-  stem: "#4f8f3a",
-  leaf: "#7cbc52",
-  wither: "#8b6b3d",
-  flowerCenter: "#f7e27a",
-  drop: "#5aa9e6",
-  select: "#fff6c8",
-};
+const SWAY_MS = 700; // 작물이 흔들리는 박자
+const RIPPLE = "#cfeaf2";
+const SELECT = "#fff6c8";
 
 export function farmSize(plots) {
   const cols = Math.max(...plots.map((p) => p.x)) + 1;
@@ -34,95 +26,76 @@ export function plotAt(plots, px, py) {
   return plots.find((p) => p.x === x && p.y === y) ?? null;
 }
 
-export function drawFarm(ctx, state, speciesById, selectedId) {
+export function drawFarm(ctx, scene) {
+  const { state, speciesById, palette, sprites, selectedId, preview, time } = scene;
+  const beat = Math.floor(time / SWAY_MS);
   for (const plot of state.plots) {
     const ox = plot.x * TILE;
     const oy = plot.y * TILE;
-    drawSoil(ctx, ox, oy, plot);
+    drawSoil(ctx, ox, oy, plot, palette);
+    // 칸마다 박자를 조금씩 어긋나게 해서 바람에 물결치듯 흔들려요
+    const frame = beat + plot.x + plot.y;
     if (plot.crop) {
       const species = speciesById.get(plot.crop.species);
-      drawPlant(ctx, ox, oy, plot.crop, species);
-      if (isThirsty(plot.crop, species)) drawDrop(ctx, ox, oy);
+      const hex = cropColor(species, plot.crop.color).hex;
+      ctx.drawImage(sprites.crop(species.id, stageOf(plot.crop), frame, hex), ox, oy);
+      if (isThirsty(plot.crop, species)) ctx.drawImage(sprites.drop, ox, oy + (frame % 2));
+    } else if (preview && preview.plotId === plot.id) {
+      const species = speciesById.get(preview.speciesId);
+      ctx.globalAlpha = 0.55; // 미리보기는 반투명하게
+      ctx.drawImage(sprites.crop(species.id, "ripe", frame, cropColor(species, preview.colorId).hex), ox, oy);
+      ctx.globalAlpha = 1;
     }
-    if (plot.id === selectedId) drawSelection(ctx, ox, oy);
   }
+  const season = seasonOf(state.meta.gameMinutes).id;
+  ctx.fillStyle = palette.seasons[season].tint;
+  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  drawParticles(ctx, season, palette.seasons[season].particle, time);
+  const selected = state.plots.find((p) => p.id === selectedId);
+  if (selected) drawSelection(ctx, selected.x * TILE, selected.y * TILE);
 }
 
-function dot(ctx, x, y, color) {
-  ctx.fillStyle = color;
-  ctx.fillRect(x, y, 1, 1);
-}
-
-// 두 색을 t(0~1) 비율로 섞습니다. 흙이 젖을수록 진해져요.
-function mix(a, b, t) {
-  const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
-  const pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
-  return `rgb(${pa.map((v, i) => Math.round(v + (pb[i] - v) * t)).join(",")})`;
-}
-
-function drawSoil(ctx, ox, oy, plot) {
+function drawSoil(ctx, ox, oy, plot, palette) {
+  const soil = palette.soil[plot.kind];
   const moisture = plot.crop ? plot.crop.moisture : 30;
-  ctx.fillStyle = COLORS.border[plot.kind];
+  ctx.fillStyle = borderColor(palette, plot.border);
   ctx.fillRect(ox, oy, TILE, TILE);
-  ctx.fillStyle = mix(COLORS.dry[plot.kind], COLORS.wet[plot.kind], moisture / 100);
+  ctx.fillStyle = mixColors(soil.dry, soil.wet, moisture / 100);
   ctx.fillRect(ox + 1, oy + 1, TILE - 2, TILE - 2);
   if (plot.kind === "paddy" && moisture > 60) {
-    for (const [x, y] of [[3, 3], [4, 3], [11, 5], [12, 5], [4, 13], [5, 13], [12, 12]]) {
-      dot(ctx, ox + x, oy + y, COLORS.ripple);
-    }
+    ctx.fillStyle = RIPPLE;
+    for (const [x, y] of [[3, 3], [4, 3], [11, 5], [12, 5], [4, 13], [5, 13], [12, 12]]) ctx.fillRect(ox + x, oy + y, 1, 1);
   }
 }
 
-function drawPlant(ctx, ox, oy, crop, species) {
-  const P = (x, y, color) => dot(ctx, ox + x, oy + y, color);
-  const stage = stageOf(crop);
-  if (stage === "seed") {
-    P(6, 12, COLORS.seed);
-    P(8, 11, COLORS.seed);
-    P(10, 12, COLORS.seed);
-    return;
-  }
-  const color = species.colors[0];
-  const height = stage === "sprout" ? 3 : 7; // 줄기 길이
-  const stems = species.type === "paddy" ? [5, 8, 11] : [8];
-  const top = 13 - height;
-  const stemColor = stage === "withered" ? COLORS.wither : COLORS.stem;
-  for (const sx of stems) {
-    for (let i = 0; i < height; i++) P(sx, 12 - i, stemColor);
-  }
-  if (stage === "withered") {
-    for (const sx of stems) P(sx + 1, top, COLORS.wither); // 고개 숙인 줄기
-    return;
-  }
-  for (const sx of stems) {
-    P(sx - 1, top + 1, COLORS.leaf);
-    P(sx + 1, top + 2, COLORS.leaf);
-    if (height > 3) {
-      P(sx - 1, top + 4, COLORS.leaf);
-      P(sx + 1, top + 5, COLORS.leaf);
-    }
-  }
-  if (stage !== "ripe") return;
-  if (species.type === "flower") {
-    for (const [x, y] of [[7, top - 1], [9, top - 1], [8, top - 2], [8, top], [7, top - 2], [9, top - 2]]) P(x, y, color);
-    P(8, top - 1, COLORS.flowerCenter);
-  } else if (species.type === "paddy") {
-    for (const sx of stems) {
-      P(sx, top - 1, color);
-      P(sx + 1, top, color); // 익어서 고개 숙인 이삭
-    }
-  } else {
-    for (const [x, y] of [[5, 8], [6, 8], [5, 9], [6, 9], [10, 10], [11, 10], [10, 11], [11, 11]]) P(x, y, color);
-  }
-}
+// 계절마다 작은 입자: 봄 꽃잎, 여름 반딧불, 가을 낙엽, 겨울 눈
+const PARTICLES = 14;
+const wrap = (v, size) => ((v % size) + size) % size;
 
-// 목마른 작물 위에 물방울 표시
-function drawDrop(ctx, ox, oy) {
-  for (const [x, y] of [[13, 1], [12, 2], [13, 2], [14, 2], [13, 3]]) dot(ctx, ox + x, oy + y, COLORS.drop);
+function drawParticles(ctx, season, color, time) {
+  const { width, height } = ctx.canvas;
+  const t = time / 1000;
+  ctx.fillStyle = color;
+  for (let i = 0; i < PARTICLES; i++) {
+    const x0 = (i * 37) % width;
+    const y0 = (i * 53) % height;
+    const speed = 3 + ((i * 7) % 5); // 입자마다 떨어지는 속도가 조금씩 달라요
+    if (season === "summer") {
+      ctx.globalAlpha = (Math.sin(t * 2 + i) + 1) / 2; // 깜빡깜빡
+      ctx.fillRect(Math.round(wrap(x0 + Math.sin(t * 0.7 + i) * 6, width)), Math.round(wrap(y0 + Math.cos(t * 0.5 + i) * 4, height)), 1, 1);
+    } else {
+      const fall = season === "winter" ? speed * 1.3 : speed;
+      const x = Math.round(wrap(x0 + Math.sin(t + i) * 3 + t * (season === "winter" ? 0.5 : 2), width));
+      const y = Math.round(wrap(y0 + t * fall, height));
+      ctx.globalAlpha = 0.9;
+      ctx.fillRect(x, y, season === "winter" ? 1 : 2, 1);
+    }
+  }
+  ctx.globalAlpha = 1;
 }
 
 function drawSelection(ctx, ox, oy) {
-  ctx.fillStyle = COLORS.select;
+  ctx.fillStyle = SELECT;
   ctx.fillRect(ox, oy, TILE, 1);
   ctx.fillRect(ox, oy + TILE - 1, TILE, 1);
   ctx.fillRect(ox, oy, 1, TILE);

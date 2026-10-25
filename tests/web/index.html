@@ -16,9 +16,13 @@
     <p id="summary">테스트 중…</p>
     <ul id="results"></ul>
     <script type="module">
-      import { results } from "./runner.js";
+      import { runAll } from "./runner.js";
       import "./farm.test.js";
       import "./time.test.js";
+      import "./decor.test.js";
+      import "./sound.test.js";
+
+      const results = await runAll();
 
       const list = document.getElementById("results");
       for (const r of results) {

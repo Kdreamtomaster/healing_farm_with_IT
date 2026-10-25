@@ -219,3 +219,62 @@ button.selected {
   background: var(--accent-dark);
   outline: 2px solid #f3d36b;
 }
+
+.seed-row {
+  margin-top: 6px;
+}
+
+.seed-name {
+  display: inline-block;
+  min-width: 96px;
+  font-size: 14px;
+}
+
+button.swatch {
+  background: var(--card);
+  color: var(--ink);
+  border-color: #c9b89a;
+  font-size: 13px;
+  padding: 4px 8px;
+}
+
+button.swatch::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  vertical-align: -1px;
+  background: var(--swatch);
+  border: 1px solid rgba(0, 0, 0, 0.35);
+}
+
+button.swatch.selected {
+  border-color: var(--accent-dark);
+  outline: 2px solid #f3d36b;
+}
+
+button.small {
+  font-size: 13px;
+  padding: 4px 8px;
+}
+
+.decor {
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px dashed #e4d6bd;
+}
+
+.toggle {
+  display: block;
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+body {
+  transition: background 1.5s;
+}
+
+button.swatch:disabled {
+  opacity: 0.45;
+}

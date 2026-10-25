@@ -3,8 +3,10 @@
 통과하면 저장에 필요한 값만 골라 담은 dict 를 돌려주고, 이상하면 ValidationError 를 냅니다.
 """
 
+import json
 import math
 import re
+from pathlib import Path
 
 ITEM_ID = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
 PLOT_KINDS = {"field", "paddy", "flowerbed"}
@@ -16,12 +18,26 @@ class ValidationError(ValueError):
     pass
 
 
-def validate_save(payload, species_ids: set) -> dict:
+def load_rules(root: Path) -> dict:
+    """검증에 필요한 "허용 목록"을 게임 데이터에서 읽어 옵니다.
+
+    colors:  작물 id → 고를 수 있는 색 id 들 (data/crops.json)
+    borders: 고를 수 있는 테두리 색 id 들 (assets/palette.json)
+    """
+    crops = json.loads((root / "data" / "crops.json").read_text(encoding="utf-8"))["crops"]
+    palette = json.loads((root / "assets" / "palette.json").read_text(encoding="utf-8"))
+    return {
+        "colors": {c["id"]: {color["id"] for color in c["colors"]} for c in crops},
+        "borders": {b["id"] for b in palette["borders"]},
+    }
+
+
+def validate_save(payload, rules: dict) -> dict:
     body = _dict(payload, "요청")
     state = _dict(body.get("state"), "state")
     meta = _dict(state.get("meta"), "state.meta")
 
-    layout, crops = [], {}
+    layout, borders, crops = [], {}, {}
     for i, raw in enumerate(_list(state.get("plots"), "state.plots", MAX_PLOTS)):
         where = f"state.plots[{i}]"
         plot = _dict(raw, where)
@@ -30,8 +46,11 @@ def validate_save(payload, species_ids: set) -> dict:
         if kind not in PLOT_KINDS:
             raise ValidationError(f"{where}.kind 값이 올바르지 않아요")
         layout.append((plot_id, _int(plot.get("x"), f"{where}.x", 0, 255), _int(plot.get("y"), f"{where}.y", 0, 255), kind))
+        if plot.get("border") not in rules["borders"]:
+            raise ValidationError(f"{where}.border 는 assets/palette.json 에 없는 색이에요")
+        borders[plot_id] = plot["border"]
         if plot.get("crop") is not None:
-            crops[plot_id] = _crop(plot["crop"], species_ids, f"{where}.crop")
+            crops[plot_id] = _crop(plot["crop"], rules["colors"], f"{where}.crop")
 
     inventory = {}
     for item, count in _dict(state.get("inventory"), "state.inventory").items():
@@ -56,16 +75,19 @@ def validate_save(payload, species_ids: set) -> dict:
             "timeScale": _number(meta.get("timeScale"), "meta.timeScale", 0.1, 1000),
         },
         "layout": layout,
+        "borders": borders,
         "crops": crops,
         "inventory": inventory,
         "log": log,
     }
 
 
-def _crop(raw, species_ids: set, where: str) -> dict:
+def _crop(raw, colors: dict, where: str) -> dict:
     crop = _dict(raw, where)
-    if crop.get("species") not in species_ids:
+    if crop.get("species") not in colors:
         raise ValidationError(f"{where}.species 는 data/crops.json 에 없는 작물이에요")
+    if crop.get("color") not in colors[crop["species"]]:
+        raise ValidationError(f"{where}.color 는 이 작물에 없는 색이에요")
     withered = crop.get("withered")
     if not isinstance(withered, bool):
         raise ValidationError(f"{where}.withered 는 true/false 여야 해요")
@@ -76,6 +98,7 @@ def _crop(raw, species_ids: set, where: str) -> dict:
         "moisture": _number(crop.get("moisture"), f"{where}.moisture", 0, 100),
         "ripeMinutes": _number(crop.get("ripeMinutes"), f"{where}.ripeMinutes", 0, 1e12),
         "withered": withered,
+        "color": crop["color"],
     }
 
 
