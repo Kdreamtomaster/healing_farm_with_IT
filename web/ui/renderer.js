@@ -1,25 +1,20 @@
 // 농장을 도트 그래픽으로 그립니다.
-// 캔버스는 실제 픽셀 크기(칸 하나 16×16)로 그리고, CSS 로 4배 확대합니다.
+// 캔버스는 실제 픽셀 크기(칸 하나 16×16)로 그리고, CSS 로 화면에 맞게 확대합니다.
 // (style.css 의 image-rendering: pixelated 덕분에 흐려지지 않아요)
 //
-// scene = { state, speciesById, palette, sprites, selectedId, preview, animator, time }
+// 그리는 순서: 배경(풀·나무·헛간) → 창고(상자·자루) → 밭과 작물 → 계절 색조 → 사람·드론 → 계절 입자 → 선택 표시
+// scene = { layout, state, speciesList, speciesById, palette, sprites, selectedId, preview, animator, time }
 //   time: 애니메이션용 시각(ms). 흔들리는 작물, 계절 효과가 이 값으로 움직여요.
 import { borderColor, cropColor, mixColors } from "../decor/palette.js";
 import { seasonOf } from "../decor/season.js";
 import { isThirsty, stageOf } from "../farm/crops.js";
-
-export const TILE = 16;
-export const ZOOM = 4;
+import { TILE } from "./layout.js";
+import { drawScenery, drawStorage } from "./scenery.js";
 const SWAY_MS = 700; // 작물이 흔들리는 박자
 const RIPPLE = "#cfeaf2";
 const SELECT = "#fff6c8";
 
-export function farmSize(plots) {
-  const cols = Math.max(...plots.map((p) => p.x)) + 1;
-  const rows = Math.max(...plots.map((p) => p.y)) + 1;
-  return { width: cols * TILE, height: rows * TILE };
-}
-
+// px, py 는 밭 왼쪽 위 모서리 기준 좌표예요
 export function plotAt(plots, px, py) {
   const x = Math.floor(px / TILE);
   const y = Math.floor(py / TILE);
@@ -27,8 +22,14 @@ export function plotAt(plots, px, py) {
 }
 
 export function drawFarm(ctx, scene) {
-  const { state, speciesById, palette, sprites, selectedId, preview, time } = scene;
+  const { layout, state, speciesById, palette, sprites, selectedId, preview, time } = scene;
+  const season = seasonOf(state.meta.gameMinutes).id;
+  const look = palette.seasons[season];
+  drawScenery(ctx, layout, palette, sprites, look);
+  drawStorage(ctx, layout, state, scene.speciesList, sprites);
   const beat = Math.floor(time / SWAY_MS);
+  ctx.save();
+  ctx.translate(layout.farm.x, layout.farm.y); // 여기부터는 밭 기준 좌표
   for (const plot of state.plots) {
     const ox = plot.x * TILE;
     const oy = plot.y * TILE;
@@ -47,13 +48,16 @@ export function drawFarm(ctx, scene) {
       ctx.globalAlpha = 1;
     }
   }
-  const season = seasonOf(state.meta.gameMinutes).id;
-  ctx.fillStyle = palette.seasons[season].tint;
+  ctx.restore();
+  ctx.fillStyle = look.tint;
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  scene.animator?.draw(ctx, sprites, time); // 농부, 드론, 스프링클러, 물길
-  drawParticles(ctx, season, palette.seasons[season].particle, time);
+  ctx.save();
+  ctx.translate(layout.farm.x, layout.farm.y);
+  scene.animator?.draw(ctx, sprites, time); // 농부와 친구들, 드론, 스프링클러, 물길
   const selected = state.plots.find((p) => p.id === selectedId);
   if (selected) drawSelection(ctx, selected.x * TILE, selected.y * TILE);
+  ctx.restore();
+  drawParticles(ctx, season, look.particle, time);
 }
 
 function drawSoil(ctx, ox, oy, plot, palette) {

@@ -13,7 +13,8 @@ import { reportToLog, summarize } from "./time/summary.js";
 import { createAnimator } from "./ui/animations.js";
 import { hideLoading, showProgress, showSummary } from "./ui/loading.js";
 import { renderHeader, renderPanel } from "./ui/panels.js";
-import { drawFarm, farmSize, plotAt, ZOOM } from "./ui/renderer.js";
+import { computeLayout, fitZoom } from "./ui/layout.js";
+import { drawFarm, plotAt } from "./ui/renderer.js";
 import { loadSprites } from "./ui/sprites.js";
 import { showToast } from "./ui/toast.js";
 
@@ -53,10 +54,28 @@ const game = {
 let lastTick = boot.serverNow;
 let busy = false; // 비운 시간을 처리하는 동안에는 1초 시계를 멈춥니다
 
-const { width, height } = farmSize(game.state.plots);
-canvas.width = width;
-canvas.height = height;
-canvas.style.width = `${width * ZOOM}px`;
+// ── 반응형 화면 ──
+// 가로로 넓은 화면(16:9 PC)은 농장 옆에 메뉴, 세로 화면(9:16, 갤럭시 S25)이나 좁은 화면은 농장 아래에 메뉴.
+// 세로 화면에서는 창고 마당도 밭 아래로 옮겨서 폭을 좁혀요.
+const SIDE_PANEL_MIN_WIDTH = 1000; // 이보다 좁으면 메뉴를 아래로
+const PANEL_WIDTH = 360;
+let layout;
+
+function fitScreen() {
+  const portrait = innerHeight > innerWidth;
+  const side = !portrait && innerWidth >= SIDE_PANEL_MIN_WIDTH;
+  document.body.classList.toggle("stacked", !side);
+  layout = computeLayout(game.state.plots, portrait);
+  canvas.width = layout.width;
+  canvas.height = layout.height;
+  const header = document.querySelector("header").offsetHeight;
+  const availableWidth = innerWidth - 32 - (side ? PANEL_WIDTH + 16 : 0);
+  const availableHeight = side ? innerHeight - header - 32 : (innerHeight - header) * (portrait ? 0.55 : 0.75);
+  const zoom = fitZoom(layout, availableWidth, availableHeight);
+  canvas.style.width = `${Math.floor(layout.width * zoom)}px`;
+}
+fitScreen();
+addEventListener("resize", fitScreen);
 
 function selectedPlot() {
   return game.state.plots.find((p) => p.id === game.selectedId) ?? null;
@@ -254,7 +273,7 @@ function animate(time) {
   if (time - lastFrame >= FRAME_MS) {
     lastFrame = time;
     animator.update(time);
-    drawFarm(ctx, { ...data, sprites, animator, state: game.state, selectedId: game.selectedId, preview: game.preview, time });
+    drawFarm(ctx, { ...data, layout, sprites, animator, state: game.state, selectedId: game.selectedId, preview: game.preview, time });
   }
   requestAnimationFrame(animate);
 }
@@ -263,7 +282,7 @@ canvas.addEventListener("click", (event) => {
   const rect = canvas.getBoundingClientRect();
   const x = ((event.clientX - rect.left) * canvas.width) / rect.width;
   const y = ((event.clientY - rect.top) * canvas.height) / rect.height;
-  game.selectedId = plotAt(game.state.plots, x, y)?.id ?? null;
+  game.selectedId = plotAt(game.state.plots, x - layout.farm.x, y - layout.farm.y)?.id ?? null;
   game.preview = null;
   draw();
 });

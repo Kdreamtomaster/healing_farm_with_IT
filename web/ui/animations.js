@@ -5,7 +5,7 @@
 // 연출이 그 칸에 닿는 순간에 실행합니다. 그래서 흙이 젖는 순간과 그림이 딱 맞아요.
 //
 // 시간은 모두 now(ms)로 받습니다. 화면에서는 requestAnimationFrame 의 시각을, 테스트에서는 아무 숫자나 넣어요.
-import { TILE } from "./renderer.js";
+import { TILE } from "./layout.js";
 
 const FARMER_SPEED = 6 * TILE; // 1초에 6칸 (px/s)
 const MAX_WALK_MS = 1000; // 아무리 멀어도 1초 안에 도착 — 기다리게 하지 않아요
@@ -45,7 +45,7 @@ const JOBS = {
   harvest: { ms: 450, hitMs: 150, pose: "farmer_work" },
 };
 const MAX_WORKERS = 4; // 농부 + 도와주러 오는 친구 최대 3명
-const EXIT_X = -12; // 친구들은 왼쪽 밖에서 들어오고 나가요
+const EXIT_X = -28; // 친구들은 화면 왼쪽 밖에서 들어오고 나가요 (밭 왼쪽 풀밭 1칸 너머)
 
 // helpers: 바쁠 때 도와주러 오는 친구들 [{ id, name, shirt }] (data/friends.json)
 export function createAnimator(helpers = []) {

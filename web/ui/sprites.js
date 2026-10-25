@@ -24,6 +24,7 @@ export async function loadSprites(manifest) {
   for (const [name, count] of Object.entries(manifest.actors)) {
     for (let f = 1; f <= count; f++) entries.push([`${name}_${f}`, `actors/${name}_${f}.png`]);
   }
+  for (const name of manifest.scenery) entries.push([name, `scenery/${name}.png`]);
   const images = Object.fromEntries(await Promise.all(entries.map(async ([key, src]) => [key, await loadImage(src)])));
   const drop = await loadImage(manifest.effects.drop);
   const marker = (name) => hexToRgb(manifest.recolor[name]);
@@ -40,6 +41,13 @@ export async function loadSprites(manifest) {
       const key = `${name}_${(frame % manifest.actors[name]) + 1}`;
       if (!shirt) return images[key];
       return cached(`${key}|${shirt}`, () => recolor(images[key], [[marker("shirt"), hexToRgb(shirt)]]));
+    },
+    // 배경 그림. hex 를 주면 표시색 자리를 그 색으로 (계절 나뭇잎, 씨앗 자루 띠)
+    scenery(name, hex) {
+      if (!hex) return images[name];
+      const main = hexToRgb(hex);
+      const shade = main.map((v) => Math.round(v * 0.8));
+      return cached(`${name}|${hex}`, () => recolor(images[name], [[marker("main"), main], [marker("shade"), shade]]));
     },
     // frame 은 0, 1, 2 … 아무 숫자나 넣으면 그 단계의 그림 수에 맞춰 돌아가요.
     crop(id, stage, frame, hex) {

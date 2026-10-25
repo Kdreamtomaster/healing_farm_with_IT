@@ -5,8 +5,18 @@
     "shirt": "#6fb0dc"
   },
   "crops": {
-    "ids": ["tomato", "potato", "rice", "tulip"],
-    "frames": { "seed": 1, "sprout": 2, "growing": 2, "ripe": 2 }
+    "ids": [
+      "tomato",
+      "potato",
+      "rice",
+      "tulip"
+    ],
+    "frames": {
+      "seed": 1,
+      "sprout": 2,
+      "growing": 2,
+      "ripe": 2
+    }
   },
   "actors": {
     "farmer_walk": 2,
@@ -16,5 +26,11 @@
   },
   "effects": {
     "drop": "effects/drop_1.png"
-  }
+  },
+  "scenery": [
+    "tree_1",
+    "barn_1",
+    "crate_1",
+    "sack_1"
+  ]
 }
