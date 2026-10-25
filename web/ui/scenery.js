@@ -9,7 +9,7 @@ function dot(ctx, x, y, color) {
 
 const inside = (x, y, r) => x >= r.x - 2 && x < r.x + r.w + 2 && y >= r.y - 2 && y < r.y + r.h + 2;
 
-export function drawScenery(ctx, layout, palette, sprites, look) {
+export function drawScenery(ctx, layout, palette, sprites, look, time = 0) {
   const { width, height } = layout;
   const { scenery } = palette;
   // 풀밭과 풀 포기 (자리는 늘 같아서 화면이 깜빡이지 않아요)
@@ -40,6 +40,16 @@ export function drawScenery(ctx, layout, palette, sprites, look) {
   // 나무 (잎이 계절 색으로)
   for (const tree of layout.trees) ctx.drawImage(sprites.scenery("tree_1", look.leaf), tree.x, tree.y);
   ctx.drawImage(sprites.scenery("barn_1"), layout.barn.x, layout.barn.y);
+  // 화덕 (불꽃이 일렁여요)
+  ctx.drawImage(sprites.scenery(`stove_${(Math.floor(time / 220) % 2) + 1}`), layout.kitchen.x, layout.kitchen.y);
+  // 체크무늬 피크닉 돗자리
+  const { picnic } = layout;
+  for (let y = 0; y < picnic.h; y++) {
+    for (let x = 0; x < picnic.w; x++) {
+      ctx.fillStyle = (Math.floor(x / 4) + Math.floor(y / 4)) % 2 ? "#f6efe2" : "#d9584a";
+      ctx.fillRect(picnic.x + x, picnic.y + y, 1, 1);
+    }
+  }
 }
 
 // 수확물 무더기: 아래 줄부터 4·3·2·1 개씩 피라미드처럼 쌓아요

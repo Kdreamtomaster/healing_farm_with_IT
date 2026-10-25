@@ -39,7 +39,8 @@ export function renderPanel(root, game, data, actions) {
       el("h2", {}, "일괄 관리"),
       Object.entries(BULK).map(([kind, { label }]) => el("button", { onclick: () => actions.bulk(kind) }, label)),
     ),
-    el("section", { class: "card" }, el("h2", {}, "창고"), inventoryList(game.state, data.speciesById)),
+    el("section", { class: "card" }, el("h2", {}, "창고"), inventoryList(game.state, data)),
+    kitchenCard(game.state, data, actions),
     settingsCard(game.state, actions),
   );
 }
@@ -152,15 +153,52 @@ function settingsCard(state, actions) {
   );
 }
 
-function inventoryList(state, speciesById) {
+// 요리하기와 나눠 먹기
+function kitchenCard(state, data, actions) {
+  const dishIcon = (recipe) => el("img", { class: "dish-icon", src: `/assets/dishes/${recipe.id}.png`, alt: "" });
+  const ingredientText = (recipe) =>
+    Object.entries(recipe.ingredients)
+      .map(([item, need]) => `${data.speciesById.get(item)?.name.ko ?? item} ${itemCount(state, item)}/${need}`)
+      .join(" · ");
+  const cooked = data.recipes.filter((r) => itemCount(state, `dish_${r.id}`) > 0);
+  return el(
+    "section",
+    { class: "card" },
+    el("h2", {}, "요리하기"),
+    el("p", { class: "hint" }, "작물이 모이면 화덕에서 요리해요. 요리는 친구들과 나눠 먹을 수 있어요."),
+    data.recipes.map((recipe) => {
+      const ready = Object.entries(recipe.ingredients).every(([item, need]) => itemCount(state, item) >= need);
+      return el(
+        "div",
+        { class: "recipe-row" },
+        dishIcon(recipe),
+        el("span", { class: "recipe-name" }, recipe.name.ko, el("small", {}, ingredientText(recipe))),
+        el("button", { class: "small", disabled: !ready, onclick: () => actions.cook(recipe.id) }, "요리하기"),
+      );
+    }),
+    cooked.length > 0 && el("h2", { class: "sub" }, "나눠 먹기"),
+    cooked.map((recipe) =>
+      el(
+        "div",
+        { class: "recipe-row" },
+        dishIcon(recipe),
+        el("span", { class: "recipe-name" }, `${recipe.name.ko} × ${itemCount(state, `dish_${recipe.id}`)}`),
+        el("button", { class: "small", onclick: () => actions.share(recipe.id) }, "나눠 먹기"),
+      ),
+    ),
+  );
+}
+
+function inventoryList(state, data) {
   const rows = Object.entries(state.inventory)
     .filter(([, count]) => count > 0)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([item, count]) => el("li", {}, `${itemName(item, speciesById)} × ${count}`));
+    .map(([item, count]) => el("li", {}, `${itemName(item, data)} × ${count}`));
   return rows.length ? el("ul", { class: "inventory" }, rows) : el("p", { class: "hint" }, "창고가 비어 있어요.");
 }
 
-function itemName(item, speciesById) {
+function itemName(item, { speciesById, recipes }) {
+  if (item.startsWith("dish_")) return recipes.find((r) => `dish_${r.id}` === item)?.name.ko ?? item;
   if (item.startsWith("seed_")) {
     const species = speciesById.get(item.slice(5));
     return species ? `${species.name.ko} 씨앗` : item;

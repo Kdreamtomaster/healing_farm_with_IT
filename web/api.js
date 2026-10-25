@@ -10,6 +10,10 @@ export async function loadSpecies() {
   return (await getJson("/data/crops.json", "작물 데이터")).crops;
 }
 
+export async function loadRecipes() {
+  return (await getJson("/data/recipes.json", "요리 데이터")).recipes;
+}
+
 export async function loadFriends() {
   return (await getJson("/data/friends.json", "친구 데이터")).friends;
 }

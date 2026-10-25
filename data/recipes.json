@@ -1,0 +1,12 @@
+{
+  "recipes": [
+    { "id": "caprese", "name": { "ko": "토마토 카프레제", "en": "Tomato Caprese" }, "ingredients": { "tomato": 2 } },
+    { "id": "potato_soup", "name": { "ko": "감자 수프", "en": "Potato Soup" }, "ingredients": { "potato": 3 } },
+    { "id": "tomato_soup", "name": { "ko": "토마토 수프", "en": "Tomato Soup" }, "ingredients": { "tomato": 3 } },
+    { "id": "rice_ball", "name": { "ko": "주먹밥", "en": "Rice Ball" }, "ingredients": { "rice": 2 } },
+    { "id": "potato_pancake", "name": { "ko": "감자전", "en": "Potato Pancake" }, "ingredients": { "potato": 2 } },
+    { "id": "potato_salad", "name": { "ko": "감자 샐러드", "en": "Potato Salad" }, "ingredients": { "potato": 2, "tomato": 1 } },
+    { "id": "omurice", "name": { "ko": "오므라이스", "en": "Omurice" }, "ingredients": { "rice": 2, "tomato": 1 } },
+    { "id": "tomato_risotto", "name": { "ko": "토마토 리조또", "en": "Tomato Risotto" }, "ingredients": { "rice": 2, "tomato": 2 } }
+  ]
+}

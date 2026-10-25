@@ -17,6 +17,8 @@ test("창고와 헛간이 화면 안에 들어간다", () => {
   for (const layout of [computeLayout(plots, false), computeLayout(plots, true)]) {
     assert(layout.crates.x + 4 * 16 <= layout.width && layout.sacks.y + 12 <= layout.height, JSON.stringify(layout.crates));
     assert(layout.barn.x + 32 <= layout.width && layout.barn.y + 32 <= layout.height, "헛간");
+    assert(layout.kitchen.x + 16 <= layout.width && layout.kitchen.y + 16 <= layout.height, "화덕");
+    assert(layout.picnic.x + layout.picnic.w <= layout.width && layout.picnic.y + layout.picnic.h <= layout.height, "돗자리");
   }
 });
 

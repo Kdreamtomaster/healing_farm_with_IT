@@ -2,10 +2,12 @@
 //
 // 가로 화면(16:9 등):          세로 화면(9:16, 갤럭시 S25 등):
 //   나무  나무    나무          나무  나무  나무
-//  ┌울타리──────┐ 헛간         ┌울타리──────┐
+//  ┌울타리──────┐화덕 헛간     ┌울타리──────┐
 //  │    밭     │길 상자        │    밭     │
 //  └──────────┘  자루         └──────────┘
-//                              헛간 상자 자루
+//      돗자리                  헛간 상자  화덕
+//                                   자루
+//                                 돗자리
 export const TILE = 16;
 
 export function computeLayout(plots, portrait) {
@@ -20,8 +22,10 @@ export function computeLayout(plots, portrait) {
     return {
       portrait,
       width: yard.x + yard.w,
-      height: farmBottom + TILE,
+      height: farmBottom + 2 * TILE,
       farm,
+      kitchen: { x: yard.x + 4, y: yard.y + 16 }, // 화덕 (요리하는 곳)
+      picnic: { x: farm.x + farm.w / 2 - 20, y: farmBottom + 10, w: 40, h: 12 }, // 나눠 먹는 돗자리
       barn: { x: yard.x + 24, y: yard.y },
       crates: { x: yard.x + 8, y: yard.y + 34 }, // 수확물 상자 줄
       sacks: { x: yard.x + 10, y: yard.y + 56 }, // 씨앗 자루 줄
@@ -33,13 +37,29 @@ export function computeLayout(plots, portrait) {
   return {
     portrait,
     width: farmRight + TILE,
-    height: yardY + 40,
+    height: yardY + 68,
     farm,
+    kitchen: { x: farm.x + 112, y: yardY + 4 },
+    picnic: { x: farm.x + farm.w / 2 - 20, y: yardY + 48, w: 40, h: 12 },
     barn: { x: farm.x, y: yardY },
     crates: { x: farm.x + 44, y: yardY },
     sacks: { x: farm.x + 46, y: yardY + 22 },
     path: { x: farm.x + 10, y: farmBottom, w: 12, h: 10 },
     trees: [2, 28, 56, 84, 112, 140].map((x, i) => ({ x, y: i % 2 ? 2 : 0 })),
+  };
+}
+
+// 돗자리 둘레의 자리 4개 (발 위치, 돗자리 쪽을 바라봐요)와 요리를 놓을 가운데
+export function picnicSeats(picnic) {
+  const { x, y, w, h } = picnic;
+  return {
+    center: { x: x + w / 2, y: y + h / 2 + 2 },
+    seats: [
+      { x: x - 3, y: y + h, facing: 1 },
+      { x: x + w + 3, y: y + h, facing: -1 },
+      { x: x + 9, y: y + 2, facing: 1 },
+      { x: x + w - 9, y: y + 2, facing: -1 },
+    ],
   };
 }
 

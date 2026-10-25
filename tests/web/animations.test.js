@@ -103,3 +103,27 @@ test("논 물길은 왼쪽 칸부터 차례로 채운다", () => {
   assert(watered.join() === "1,2,3", watered.join());
   assert(done);
 });
+
+test("요리: 화덕에 가서 끓이고 다 되면 한 번 알려 준다", () => {
+  const animator = createAnimator(FRIENDS);
+  let cooked = 0;
+  animator.cook({ x: 150, y: 30 }, () => (cooked += 1));
+  run(animator, 1000);
+  assert(cooked === 0, "아직 끓는 중");
+  run(animator, 4000, 1050);
+  assert(cooked === 1);
+});
+
+test("나눠 먹기: 농부와 친구 셋이 모두 모여 먹은 뒤에 done 을 한 번 부르고, 친구들은 돌아간다", () => {
+  const animator = createAnimator(FRIENDS);
+  const seats = [{ x: 40, y: 80, facing: 1 }, { x: 90, y: 80, facing: -1 }, { x: 55, y: 70, facing: 1 }, { x: 75, y: 70, facing: -1 }];
+  let done = 0;
+  animator.feast(seats, "potato_soup", { x: 65, y: 76 }, () => (done += 1));
+  assert(animator.workers.length === 4, "모두 모여요");
+  run(animator, 2000);
+  assert(done === 0, "아직 먹는 중");
+  run(animator, 5000, 2050);
+  assert(done === 1, `done ${done}번`);
+  run(animator, 9000, 5050);
+  assert(animator.workers.length === 1 && !animator.isBusy(), "친구들은 돌아가고 상도 치워요");
+});

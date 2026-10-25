@@ -37,7 +37,10 @@ assets/
 │   ├── tree_1.png    ← 나무 (잎은 표시색 → 계절 잎 색으로)
 │   ├── barn_1.png    ← 헛간 (32×32)
 │   ├── crate_1.png   ← 수확물 상자 (위에 수확물이 쌓임)
-│   └── sack_1.png    ← 씨앗 자루 (띠는 표시색 → 작물 색으로, 12×12)
+│   ├── sack_1.png    ← 씨앗 자루 (띠는 표시색 → 작물 색으로, 12×12)
+│   └── stove_1.png, stove_2.png ← 냄비 올린 화덕 (불꽃 2프레임)
+├── dishes/           ← 요리 그림 (data/recipes.json 의 id 와 같은 이름)
+│   └── caprese.png, potato_soup.png, … (8가지)
 └── effects/
     └── drop_1.png    ← 목마른 작물 위 물방울
 ```

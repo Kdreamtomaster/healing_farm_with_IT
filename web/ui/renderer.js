@@ -25,7 +25,7 @@ export function drawFarm(ctx, scene) {
   const { layout, state, speciesById, palette, sprites, selectedId, preview, time } = scene;
   const season = seasonOf(state.meta.gameMinutes).id;
   const look = palette.seasons[season];
-  drawScenery(ctx, layout, palette, sprites, look);
+  drawScenery(ctx, layout, palette, sprites, look, time);
   drawStorage(ctx, layout, state, scene.speciesList, sprites);
   const beat = Math.floor(time / SWAY_MS);
   ctx.save();

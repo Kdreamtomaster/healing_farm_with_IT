@@ -43,7 +43,12 @@ const JOBS = {
   flood: { ms: 600, hitMs: 200, pose: "farmer_pour" },
   plant: { ms: 450, hitMs: 200, pose: "farmer_work" },
   harvest: { ms: 450, hitMs: 150, pose: "farmer_work" },
+  cook: { ms: 1600, hitMs: 1500, pose: "farmer_work" }, // 화덕 앞에서 보글보글
+  eat: { ms: 2600, hitMs: 2500, pose: "farmer_work" }, // 돗자리에 앉아 냠냠
 };
+
+// 칸에서 일할 때 서는 자리 (칸의 왼쪽, 발 위치)
+const plotSpot = (plot) => ({ x: plot.x * TILE + 3, y: plot.y * TILE + 14 });
 const MAX_WORKERS = 4; // 농부 + 도와주러 오는 친구 최대 3명
 const EXIT_X = -28; // 친구들은 화면 왼쪽 밖에서 들어오고 나가요 (밭 왼쪽 풀밭 1칸 너머)
 
@@ -73,20 +78,20 @@ export function createAnimator(helpers = []) {
       const job = worker.queue.shift();
       worker.job = { ...job, arrived: null, hit: false };
       worker.leaving = false;
-      walkTo(worker, { x: job.plot.x * TILE + 3, y: job.plot.y * TILE + 14 }, now); // 칸의 왼쪽에 서서 일해요
+      walkTo(worker, job.at, now);
     }
     const job = worker.job;
     if (job) {
       if (job.arrived === null) {
         if (!step(worker, now)) return;
         job.arrived = now;
-        worker.facing = 1;
+        worker.facing = job.facing ?? 1;
       }
       const t = now - job.arrived;
       const { ms, hitMs } = JOBS[job.kind];
       if (!job.hit && t >= hitMs) {
         job.hit = true;
-        job.apply(job.plot, worker);
+        job.apply(worker);
       }
       if (t >= ms) worker.job = null;
       return;
@@ -101,30 +106,62 @@ export function createAnimator(helpers = []) {
     }
   }
 
+  // 친구 한 명을 화면 왼쪽 밖에서 불러와요
+  function callFriend(friend, y, job) {
+    const helper = { ...friend, x: EXIT_X, y, facing: 1, queue: [job], job: null, walk: null, leaving: false };
+    workers.push(helper);
+    return helper;
+  }
+
+  // 일 맡기기: 쉬는 사람 → 새 친구 부르기 → 그래도 없으면 할 일이 가장 적은 사람 순서로
+  function assign(job) {
+    const idle = workers.filter(isIdle).sort((a, b) => distance(a, job.at) - distance(b, job.at))[0];
+    if (idle) {
+      idle.queue.push(job);
+      return idle;
+    }
+    const friend = helpers.find((h) => !workers.some((w) => w.id === h.id));
+    if (friend && workers.length < MAX_WORKERS) return callFriend(friend, job.at.y, job);
+    const load = (w) => w.queue.length + (w.job ? 1 : 0);
+    const least = [...workers].sort((a, b) => load(a) - load(b))[0];
+    least.queue.push(job);
+    return least;
+  }
+
   return {
     workers,
 
-    // 일 맡기기: 쉬는 사람 → 새 친구 부르기 → 그래도 없으면 할 일이 가장 적은 사람 순서로
+    // 칸에 일 맡기기
     //   kind: "water" | "flood" | "plant" | "harvest"
     //   apply(plot, worker): 그 칸에서 실제로 일을 하는 함수 (worker.name 이 있으면 친구가 한 일)
     work(plot, kind, apply, now) {
-      const job = { plot, kind, apply };
-      const target = { x: plot.x * TILE + 3, y: plot.y * TILE + 14 };
-      const idle = workers.filter(isIdle).sort((a, b) => distance(a, target) - distance(b, target))[0];
-      if (idle) {
-        idle.queue.push(job);
-        return idle;
-      }
-      const friend = helpers.find((h) => !workers.some((w) => w.id === h.id));
-      if (friend && workers.length < MAX_WORKERS) {
-        const helper = { ...friend, x: EXIT_X, y: target.y, facing: 1, queue: [job], job: null, walk: null, leaving: false };
-        workers.push(helper);
-        return helper;
-      }
-      const load = (w) => w.queue.length + (w.job ? 1 : 0);
-      const least = [...workers].sort((a, b) => load(a) - load(b))[0];
-      least.queue.push(job);
-      return least;
+      return assign({ plot, at: plotSpot(plot), kind, apply: (worker) => apply(plot, worker) });
+    },
+
+    // 화덕에서 요리하기: spot 은 화덕 왼쪽 발 위치(밭 기준 좌표). 다 되면 apply(worker)
+    cook(spot, apply) {
+      return assign({ at: spot, kind: "cook", apply });
+    },
+
+    // 다 같이 나눠 먹기: 농부와 친구들이 돗자리(seats)에 둘러앉아 먹어요. 하던 일이 있으면 마치고 와요.
+    //   seats: [{ x, y, facing }] 사람 수만큼, dish: 가운데 놓을 요리 그림 이름, center: 요리 놓을 자리
+    //   모두 다 먹으면 done()
+    feast(seats, dish, center, done) {
+      const people = [farmer, ...helpers.map((h) => workers.find((w) => w.id === h.id) ?? h)];
+      let eating = people.length;
+      const feast = { kind: "feast", dish, center, finished: false, update: () => !feast.finished };
+      const finish = () => {
+        eating -= 1;
+        if (eating > 0) return;
+        feast.finished = true;
+        done();
+      };
+      people.forEach((person, i) => {
+        const job = { at: seats[i % seats.length], facing: seats[i % seats.length].facing, kind: "eat", apply: finish };
+        if (workers.includes(person)) person.queue.push(job);
+        else callFriend(person, seats[i % seats.length].y, job);
+      });
+      effects.push(feast);
     },
 
     // 맡겨 둔 일이 모두 몇 개인지 (하는 중 + 기다리는 중)
@@ -134,7 +171,7 @@ export function createAnimator(helpers = []) {
 
     // 이 칸에 누가 일하러 가는 중인지 (같은 일을 두 번 맡기지 않도록)
     isPending(plotId) {
-      return workers.some((w) => w.job?.plot.id === plotId || w.queue.some((j) => j.plot.id === plotId));
+      return workers.some((w) => w.job?.plot?.id === plotId || w.queue.some((j) => j.plot?.id === plotId));
     },
 
     // 드론: 가까운 칸부터 들러 물을 뿌리고 날아가요. 다 끝나면 done()
@@ -288,6 +325,18 @@ function drawJobEffect(ctx, worker, kind, t) {
     // 흙이 톡톡 튀어요
     const k = (t - JOBS.plant.hitMs) / 250;
     if (k < 1) for (const dx of [-2, 0, 2]) dot(ctx, sx + 1 + dx * (1 + k), sy + 6 - Math.sin(k * Math.PI) * 3, "#6b4a2b");
+  } else if (kind === "cook") {
+    // 냄비에서 김이 모락모락
+    for (let i = 0; i < 3; i++) {
+      const k = ((t / 700 + i / 3) % 1);
+      dot(ctx, worker.x + 12 + i * 3 + Math.sin(t / 150 + i), worker.y - 9 - k * 7, "#f4f7f8");
+    }
+  } else if (kind === "eat") {
+    // 냠냠 먹으며 하트가 퐁퐁
+    const k = (t % 900) / 900;
+    const hx = worker.x - 2 + (worker.id.length % 3);
+    const hy = worker.y - 18 - k * 6;
+    for (const [dx, dy] of [[0, 0], [2, 0], [0, 1], [1, 1], [2, 1], [1, 2]]) dot(ctx, hx + dx, hy + dy, "#f06a8a");
   } else if (kind === "harvest" && t >= JOBS.harvest.hitMs) {
     // 반짝반짝
     const k = (t - JOBS.harvest.hitMs) / 300;
@@ -296,6 +345,11 @@ function drawJobEffect(ctx, worker, kind, t) {
 }
 
 const DRAW = {
+  // 돗자리 가운데 놓인 요리
+  feast(ctx, sprites, effect) {
+    ctx.drawImage(sprites.dish(effect.dish), Math.round(effect.center.x - 8), Math.round(effect.center.y - 10));
+  },
+
   drone(ctx, sprites, effect, now) {
     const pos = effect.position(now);
     if (pos.spraying) {

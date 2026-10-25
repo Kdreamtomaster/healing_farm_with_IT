@@ -31,6 +31,18 @@
     "tree_1",
     "barn_1",
     "crate_1",
-    "sack_1"
+    "sack_1",
+    "stove_1",
+    "stove_2"
+  ],
+  "dishes": [
+    "caprese",
+    "potato_soup",
+    "tomato_soup",
+    "rice_ball",
+    "potato_pancake",
+    "potato_salad",
+    "omurice",
+    "tomato_risotto"
   ]
 }

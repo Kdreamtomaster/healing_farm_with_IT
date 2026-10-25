@@ -29,6 +29,26 @@ export const EFFECTS = {
     { note: "A5", at: 0.18, len: 0.2, slideTo: "D5", wave: "triangle", volume: 0.2 },
     { note: "C6", at: 0.36, len: 0.3, slideTo: "E5", wave: "triangle", volume: 0.2 },
   ],
+  // 요리 완성: 보글보글 끓다가 "띵!"
+  cook: [
+    { note: "C5", at: 0, len: 0.06, volume: 0.1 },
+    { note: "E5", at: 0.08, len: 0.06, volume: 0.1 },
+    { note: "D5", at: 0.16, len: 0.06, volume: 0.1 },
+    { note: "C7", at: 0.3, len: 0.35, wave: "triangle", volume: 0.25 },
+  ],
+  // 다 같이 먹자고 부를 때
+  call: [
+    { note: "G5", at: 0, len: 0.12, wave: "triangle", volume: 0.22 },
+    { note: "E5", at: 0.14, len: 0.12, wave: "triangle", volume: 0.22 },
+    { note: "G5", at: 0.28, len: 0.2, wave: "triangle", volume: 0.22 },
+  ],
+  // 다 먹고 "냠냠, 맛있다!"
+  yum: [
+    { note: "E5", at: 0, len: 0.1 },
+    { note: "G5", at: 0.1, len: 0.1 },
+    { note: "E6", at: 0.2, len: 0.12 },
+    { note: "C6", at: 0.34, len: 0.3, wave: "triangle", volume: 0.24 },
+  ],
   // 수확: 도-미-솔-도 올라가는 소리
   harvest: [
     { note: "C5", at: 0, len: 0.08 },

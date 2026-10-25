@@ -25,6 +25,7 @@ export async function loadSprites(manifest) {
     for (let f = 1; f <= count; f++) entries.push([`${name}_${f}`, `actors/${name}_${f}.png`]);
   }
   for (const name of manifest.scenery) entries.push([name, `scenery/${name}.png`]);
+  for (const name of manifest.dishes) entries.push([`dish_${name}`, `dishes/${name}.png`]);
   const images = Object.fromEntries(await Promise.all(entries.map(async ([key, src]) => [key, await loadImage(src)])));
   const drop = await loadImage(manifest.effects.drop);
   const marker = (name) => hexToRgb(manifest.recolor[name]);
@@ -41,6 +42,10 @@ export async function loadSprites(manifest) {
       const key = `${name}_${(frame % manifest.actors[name]) + 1}`;
       if (!shirt) return images[key];
       return cached(`${key}|${shirt}`, () => recolor(images[key], [[marker("shirt"), hexToRgb(shirt)]]));
+    },
+    // 요리 그림 (data/recipes.json 의 id)
+    dish(name) {
+      return images[`dish_${name}`];
     },
     // 배경 그림. hex 를 주면 표시색 자리를 그 색으로 (계절 나뭇잎, 씨앗 자루 띠)
     scenery(name, hex) {

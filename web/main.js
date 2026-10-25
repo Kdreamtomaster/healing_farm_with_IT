@@ -1,9 +1,10 @@
 // 게임 시작점: 데이터와 세이브를 불러와 비운 시간을 처리하고, 1초마다 농장의 시간을 흘려보냅니다.
-import { loadFriends, loadManifest, loadPalette, loadSpecies, loadState, saveState } from "./api.js";
+import { loadFriends, loadManifest, loadPalette, loadRecipes, loadSpecies, loadState, saveState } from "./api.js";
 import { applyBorderToKind, setBorder } from "./decor/plots-style.js";
 import { BULK, bulkTargets, flood, water } from "./farm/care.js";
 import { advanceFarm } from "./farm/crops.js";
 import { nextTask } from "./farm/autopilot.js";
+import { finishCooking, share, startCooking } from "./friends/cooking.js";
 import { harvest, plant } from "./farm/harvest.js";
 import { playSound, setSound, unlockAudio } from "./sound/engine.js";
 import { josa, PLOT_NAMES } from "./text.js";
@@ -14,7 +15,7 @@ import { reportToLog, summarize } from "./time/summary.js";
 import { createAnimator } from "./ui/animations.js";
 import { hideLoading, showProgress, showSummary } from "./ui/loading.js";
 import { renderHeader, renderPanel } from "./ui/panels.js";
-import { computeLayout, fitZoom } from "./ui/layout.js";
+import { computeLayout, fitZoom, picnicSeats } from "./ui/layout.js";
 import { drawFarm, plotAt } from "./ui/renderer.js";
 import { loadSprites } from "./ui/sprites.js";
 import { showToast } from "./ui/toast.js";
@@ -30,16 +31,18 @@ const canvas = document.getElementById("farm");
 const ctx = canvas.getContext("2d");
 const panel = document.getElementById("panel");
 
-const [speciesList, friends, palette, manifest, boot] = await Promise.all([
+const [speciesList, friends, recipes, palette, manifest, boot] = await Promise.all([
   loadSpecies(),
   loadFriends(),
+  loadRecipes(),
   loadPalette(),
   loadManifest(),
   loadState(),
 ]);
 const sprites = await loadSprites(manifest);
 const speciesById = new Map(speciesList.map((s) => [s.id, s]));
-const data = { speciesList, speciesById, palette };
+const data = { speciesList, speciesById, palette, recipes };
+let feasting = false; // 나눠 먹는 중에는 또 상을 차리지 않아요
 const animator = createAnimator(friends); // 농부(바쁘면 친구들이 도우러 와요), 드론, 스프링클러, 물길 연출
 data.isPending = (plotId) => animator.isPending(plotId);
 
@@ -207,6 +210,37 @@ const actions = {
     const plot = selectedPlot();
     const count = applyBorderToKind(game.state, plot.kind, plot.border);
     report({ ok: count > 0, message: count ? `${PLOT_NAMES[plot.kind]} ${count}칸의 테두리를 바꿨어요` : "이미 모두 같은 색이에요" }, "decor", `${plot.kind}:${plot.border}`);
+  },
+  // 요리: 재료를 꺼내 두고, 농부가 화덕에 가서 보글보글 끓이면 창고에 요리가 들어가요.
+  cook(recipeId) {
+    const recipe = recipes.find((r) => r.id === recipeId);
+    const started = startCooking(game.state, recipe);
+    if (!started.ok) return report(started);
+    const spot = { x: layout.kitchen.x - 2 - layout.farm.x, y: layout.kitchen.y + 15 - layout.farm.y };
+    animator.cook(spot, (worker) => {
+      const result = finishCooking(game.state, recipe);
+      const who = worker.name ? `${josa(worker.name, "이가", "가")} ` : "";
+      report({ ...result, message: `${who}${result.message}` }, "cook", recipe.id, "cook", worker.name ?? "player");
+    });
+    showToast(started.message);
+    draw();
+  },
+  // 나눠 먹기: 농부와 친구들이 돗자리에 둘러앉아 맛있게 먹어요
+  share(recipeId) {
+    if (feasting) return report({ ok: false, message: "지금 다 같이 먹고 있어요. 다 먹으면 또 차려 주세요" });
+    const recipe = recipes.find((r) => r.id === recipeId);
+    const result = share(game.state, recipe);
+    if (!result.ok) return report(result);
+    feasting = true;
+    const { center, seats } = picnicSeats(layout.picnic);
+    const rel = (p) => ({ ...p, x: p.x - layout.farm.x, y: p.y - layout.farm.y });
+    playSound("call");
+    animator.feast(seats.map(rel), recipe.id, rel(center), () => {
+      feasting = false;
+      report(result, "share", recipe.id, "yum");
+    });
+    showToast("다들 모여라~ 맛있는 거 먹자!");
+    draw();
   },
   setTimeScale(scale) {
     tick(); // 지금까지는 이전 배율로 계산하고
