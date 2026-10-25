@@ -25,13 +25,24 @@ def load_rules(root: Path) -> dict:
     colors:  작물 id → 고를 수 있는 색 id 들 (data/crops.json)
     borders: 고를 수 있는 테두리 색 id 들 (assets/palette.json)
     species: 작물 id → data/crops.json 의 항목 (연구소로 보낼 때 씀)
+    traits:  돌연변이 특징 (data/mutations.json), unlocks: 해금 id 들 (data/unlocks.json)
     """
-    crops = json.loads((root / "data" / "crops.json").read_text(encoding="utf-8"))["crops"]
-    palette = json.loads((root / "assets" / "palette.json").read_text(encoding="utf-8"))
+    def read(*parts):
+        return json.loads(root.joinpath(*parts).read_text(encoding="utf-8"))
+
+    crops = read("data", "crops.json")["crops"]
+    colors = {c["id"]: {color["id"] for color in c["colors"]} for c in crops}
+    unlocks = read("data", "unlocks.json")["unlocks"]
+    for unlock in unlocks:  # 해금으로 열리는 희귀 색도 저장할 수 있어야 해요
+        color = unlock["gives"].get("color")
+        if color:
+            colors[color["species"]].add(color["id"])
     return {
-        "colors": {c["id"]: {color["id"] for color in c["colors"]} for c in crops},
-        "borders": {b["id"] for b in palette["borders"]},
+        "colors": colors,
+        "borders": {b["id"] for b in read("assets", "palette.json")["borders"]},
         "species": {c["id"]: c for c in crops},
+        "traits": {k: set(v) for k, v in read("data", "mutations.json")["traits"].items()},
+        "unlocks": {u["id"] for u in unlocks},
     }
 
 
@@ -83,6 +94,15 @@ def validate_save(payload, rules: dict) -> dict:
         game_meta["knownSpecies"] = sorted(known)
     if "smartfarm" in meta:
         game_meta["smartfarm"] = _smartfarm(meta["smartfarm"])
+    if "stats" in meta:
+        game_meta["stats"] = _stats(meta["stats"], rules)
+    if "codex" in meta:
+        game_meta["codex"] = _codex(meta["codex"], rules)
+    if "unlocked" in meta:
+        unlocked = _list(meta["unlocked"], "meta.unlocked", len(rules["unlocks"]))
+        if any(u not in rules["unlocks"] for u in unlocked if isinstance(u, str)) or not all(isinstance(u, str) for u in unlocked):
+            raise ValidationError("meta.unlocked 에 data/unlocks.json 에 없는 해금이 있어요")
+        game_meta["unlocked"] = unlocked
 
     return {
         "meta": game_meta,
@@ -147,6 +167,49 @@ def _name(value, where: str) -> str:
     if not isinstance(value, str) or not TASK_ID.match(value):
         raise ValidationError(f"{where} 는 영어 소문자·숫자·_ 로 된 이름이어야 해요")
     return value
+
+
+# ── 6단계: 서명된 집계 숫자와 도감 ──
+STAT_COUNTS = {"cooked", "crafted", "gifts", "mutants"}
+CODEX_ID = re.compile(r"^[a-z][a-z0-9_]{0,60}$")
+
+
+def _stats(raw, rules: dict) -> dict:
+    stats = _dict(raw, "meta.stats")
+    for key, value in stats.items():
+        if key == "harvests":
+            for species, n in _dict(value, "meta.stats.harvests").items():
+                if species not in rules["colors"]:
+                    raise ValidationError("meta.stats.harvests 에 모르는 작물이 있어요")
+                _int(n, f"meta.stats.harvests.{species}", 0, 10**9)
+        elif key in STAT_COUNTS:
+            _int(value, f"meta.stats.{key}", 0, 10**9)
+        else:
+            raise ValidationError(f"meta.stats.{str(key)[:20]} 는 모르는 집계예요")
+    return stats
+
+
+def _codex(raw, rules: dict) -> list:
+    entries = _list(raw, "meta.codex", 300)
+    for i, entry in enumerate(entries):
+        where = f"meta.codex[{i}]"
+        entry = _dict(entry, where)
+        if not isinstance(entry.get("id"), str) or not CODEX_ID.match(entry["id"]):
+            raise ValidationError(f"{where}.id 모양이 올바르지 않아요")
+        if entry.get("species") not in rules["colors"]:
+            raise ValidationError(f"{where}.species 는 data/crops.json 에 있는 작물이어야 해요")
+        truth = _dict(entry.get("truth"), f"{where}.truth")
+        if not truth or any(k not in rules["traits"] or v not in rules["traits"][k] for k, v in truth.items()):
+            raise ValidationError(f"{where}.truth 에 모르는 특징이 있어요")
+        if entry.get("label") is not None:
+            for k, v in _dict(entry["label"], f"{where}.label").items():
+                if k not in rules["traits"] or (v != "none" and v not in rules["traits"][k]):
+                    raise ValidationError(f"{where}.label 에 모르는 특징이 있어요")
+        _text(entry.get("name", ""), f"{where}.name", 20)
+        _number(entry.get("foundAt"), f"{where}.foundAt", 0, 1e12)
+        if entry.get("labeledAt") is not None:
+            _number(entry["labeledAt"], f"{where}.labeledAt", 0, 1e12)
+    return entries
 
 
 HEX_COLOR = re.compile(r"^#[0-9a-f]{6}$")

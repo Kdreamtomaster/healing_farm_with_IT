@@ -7,6 +7,7 @@
 | GET  /api/state   | 저장된 농장 상태 + 무결성 결과 + 복구 안내 (변조면 바뀐 곳도) |
 | POST /api/save    | 농장 상태 저장                                 |
 | POST /api/reset   | 완전 초기화 (변조가 확인된 때만)                |
+| GET  /api/journal         | 농장 일지: 작업 기록 원본 → 정리 → 집계(SQL) |
 | GET  /api/lab/state       | 연구소 상태 + 지문 실험대 재료              |
 | POST /api/lab/import      | 농장 작물 → 연구소 (한 방향)               |
 | POST /api/lab/fuel        | 실험 작물 → 바이오 연료 → 농장              |
@@ -58,6 +59,7 @@ def resolve_static(root: Path, url_path: str):
 
 def make_server(store: FarmStore, root: Path, port: int, lab: LabStore = None) -> ThreadingHTTPServer:
     rules = validation.load_rules(root)
+    friends = json.loads((root / "data" / "friends.json").read_text(encoding="utf-8"))["friends"]
     lab = lab or LabStore(store.saves_dir)
 
     # 저장이 아닌 POST 요청들: 주소 → (요청 body → 답장 dict)
@@ -102,6 +104,8 @@ def make_server(store: FarmStore, root: Path, port: int, lab: LabStore = None) -
                 return self._send_json(200, {**store.load(), "serverNow": _now()})
             if path == "/api/lab/state":
                 return self._send_json(200, lab.load())
+            if path == "/api/journal":
+                return self._send_json(200, store.journal(friends))
             if path == "/":
                 path = "/web/index.html"
             elif path.endswith("/"):

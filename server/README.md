@@ -37,6 +37,7 @@ python server/main.py
 | `GET  /api/state` | 농장 상태 + 무결성 결과(`ok`/`tampered`) + 복구 안내 + 서버 시각 |
 | `POST /api/save` | 농장 상태와 작업 기록 저장. 검증 실패 400, 저장 잠김 409 |
 | `POST /api/reset` | 완전 초기화. 지문이 맞지 않을(변조) 때만, 아니면 409 |
+| `GET  /api/journal` | 농장 일지: 작업 기록 원본 → 정리 → 집계(미리 정한 SQL 과 결과) |
 | `GET  /api/lab/state` | 연구소 상태 + 정규화 글자·SHA-256·HMAC·연구소 키 |
 | `POST /api/lab/import` | 농장 작물 → 연구소 `{ species, count }` |
 | `POST /api/lab/fuel` | 실험 작물 → 바이오 연료 → 농장 `{ sampleId, count }` |
@@ -48,7 +49,8 @@ python server/main.py
 |---|---|
 | `main.py` | 서버 시작점 (`--port`, `--no-browser` 옵션) |
 | `api.py` | 위 주소들을 처리, 경로 조작 방지, 요청 출처 확인 |
-| `validation.py` | 저장 요청 검증 (형식, 범위, 알 수 없는 작물) |
+| `validation.py` | 저장 요청 검증 (형식, 범위, 알 수 없는 작물, 스마트팜 DAG 순환, 도감·집계 숫자) |
+| `journal.py` | 농장 일지 파이프라인: 옛 기록 정리, 메모리 속 표 `clean_log` 에 SQL 집계 |
 | `storage/` | SQLite 저장·백업·복구 → [storage/README.md](storage/README.md) |
 | `integrity/` | 해시 검증, 변조된 곳 찾기 → [integrity/README.md](integrity/README.md) |
 | `lab/` | 연구소 세이브와 송장 → [lab/README.md](lab/README.md) |

@@ -46,9 +46,9 @@ export function reportToLog(report, at, friends) {
   for (const friend of friends) {
     const done = report.friends[friend.id];
     if (!done) continue;
-    if (done.water) entries.push({ at, actor: friend.name, action: "water", detail: String(done.water) });
+    if (done.water) entries.push({ at, actor: friend.id, action: "water", detail: JSON.stringify({ count: done.water }) });
     for (const [id, n] of Object.entries(done.harvest)) {
-      entries.push({ at, actor: friend.name, action: "harvest", detail: `${id}:${n}` });
+      entries.push({ at, actor: friend.id, action: "harvest", detail: JSON.stringify({ species: id, count: n }) });
     }
   }
   return entries;

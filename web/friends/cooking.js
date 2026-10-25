@@ -1,7 +1,7 @@
 // 요리하기와 나눠 먹기 규칙입니다.
 // 요리는 창고의 작물을 써서 만들고(dish_요리이름 으로 창고에 들어가요), 나눠 먹으면 창고에서 빠져요.
 // 모든 함수는 { ok, message } 를 돌려줍니다.
-import { addItem, itemCount, takeItem } from "../state.js";
+import { addItem, addStat, itemCount, takeItem } from "../state.js";
 import { josa } from "../text.js";
 
 export const dishId = (recipeId) => `dish_${recipeId}`;
@@ -24,6 +24,7 @@ export function startCooking(state, recipe) {
 
 export function finishCooking(state, recipe) {
   addItem(state, dishId(recipe.id));
+  addStat(state, "cooked");
   return { ok: true, message: `${josa(recipe.name.ko, "을", "를")} 만들었어요` };
 }
 

@@ -1,13 +1,29 @@
 // 게임 시작점: 데이터와 세이브를 불러와 비운 시간을 처리하고, 1초마다 농장의 시간을 흘려보냅니다.
 // 마우스·키보드 조작, 도구, 메뉴(옆에 붙이기 · 팝업 · 새 창)도 여기서 이어 줘요.
-import { loadCrafts, loadFriends, loadManifest, loadPalette, loadRecipes, loadSmartfarmTemplates, loadSpecies, loadState, resetFarm, saveState } from "./api.js";
+import {
+  loadCrafts,
+  loadFriends,
+  loadJournal,
+  loadManifest,
+  loadMutations,
+  loadPalette,
+  loadRecipes,
+  loadSmartfarmTemplates,
+  loadSpecies,
+  loadState,
+  loadUnlocks,
+  resetFarm,
+  saveState,
+} from "./api.js";
 import { isRestTime, lightAt } from "./decor/daylight.js";
 import { applyBorderToKind, setBorder } from "./decor/plots-style.js";
 import { seasonOf } from "./decor/season.js";
 import { nextKitchenTask, nextTask } from "./farm/autopilot.js";
 import { BULK, bulkTargets, flood, water } from "./farm/care.js";
 import { advanceFarm, PLOT_FOR_TYPE } from "./farm/crops.js";
+import { configureMutations, labelEntry } from "./farm/codex.js";
 import { giftMessage, giftNewSeeds } from "./farm/seed-gift.js";
+import { applyUnlock, checkUnlocks } from "./farm/unlocks.js";
 import { createLab } from "./lab/sandbox.js";
 import { addFromTemplate, addTask, connect, disconnect, removeDag, removeTask, setOption, setSchedule } from "./smartfarm/editor.js";
 import { newSmartfarm, tickSmartfarm, triggerRun } from "./smartfarm/runner.js";
@@ -51,12 +67,14 @@ const toolbar = document.getElementById("toolbar");
 const floatMenu = document.getElementById("float-menu");
 const helpBox = document.getElementById("help");
 
-const [speciesList, friends, recipes, crafts, smartfarmTemplates, palette, manifest, boot] = await Promise.all([
+const [speciesList, friends, recipes, crafts, smartfarmTemplates, mutations, unlocks, palette, manifest, boot] = await Promise.all([
   loadSpecies(),
   loadFriends(),
   loadRecipes(),
   loadCrafts(),
   loadSmartfarmTemplates(),
+  loadMutations(),
+  loadUnlocks(),
   loadPalette(),
   loadManifest(),
   loadState(),
@@ -64,7 +82,8 @@ const [speciesList, friends, recipes, crafts, smartfarmTemplates, palette, manif
 const sprites = await loadSprites(manifest);
 const speciesById = new Map(speciesList.map((s) => [s.id, s]));
 const icons = createIcons(sprites, speciesById);
-const data = { speciesList, speciesById, palette, recipes, crafts, friends, icons, smartfarmTemplates };
+const data = { speciesList, speciesById, palette, recipes, crafts, friends, icons, smartfarmTemplates, mutations, unlocks };
+configureMutations(mutations); // 수확할 때 아주 가끔 돌연변이 (web/farm/codex.js)
 let feasting = false; // 나눠 먹는 중에는 또 상을 차리지 않아요
 let gifting = false; // 선물을 건네는 중에는 다음 선물을 기다려요
 const animator = createAnimator(friends); // 농부(바쁘면 친구들이 도우러 와요), 드론, 스프링클러, 물길 연출
@@ -103,10 +122,22 @@ const game = {
   // 메뉴: dock(옆에 붙이기) · float(농장 위 팝업) · window(새 창)
   menu: { mode: "dock", floatOpen: false, folded: Boolean(prefs.folded) },
   ui: {}, // 접어 둔 목록을 펼쳤는지 같은 작은 화면 상태
+  journal: null, // 농장 일지 (일지 탭을 열면 서버에서 읽어요)
   lab: null, // 연구소 상태 (연구소 탭을 열면 서버에서 읽어요)
   labBench: null, // 지문 실험대의 "만약에" 계산 결과
   locust: null, // 메뚜기 떼 연출 중이면 { front }
 };
+
+// ── 해금: 이미 열린 희귀 색·레시피를 게임 데이터에 더하고, 새로 열린 것은 알려 줘요 ──
+for (const unlock of unlocks) if ((game.state.meta.unlocked ?? []).includes(unlock.id)) applyUnlock(unlock, speciesById, recipes);
+function noticeUnlocks() {
+  for (const unlock of checkUnlocks(game.state, unlocks)) {
+    applyUnlock(unlock, speciesById, recipes);
+    record("unlock", { id: unlock.id }, "system");
+    showToast(`🔓 새로 열렸어요: ${unlock.name}`);
+    playSound("welcome");
+  }
+}
 
 // ── 스마트팜: 블록 흐름(DAG)대로 농장이 일해요 (web/smartfarm/) ──
 game.state.meta.smartfarm ??= newSmartfarm();
@@ -117,7 +148,7 @@ function runMachines(state, quiet = false) {
   const sf = state.meta.smartfarm;
   const events = tickSmartfarm(sf, state, state.meta.gameMinutes, machineEnv);
   for (const event of events) {
-    record("smartfarm", JSON.stringify(event), "smartfarm");
+    record("smartfarm", event, "smartfarm");
     if (quiet || !event.run || event.run === "started") continue;
     const name = sf.dags.find((d) => d.id === event.dag)?.name ?? event.dag;
     if (!idleMode) showToast(event.run === "success" ? `🤖 스마트팜 "${name}" 다 했어요 ✔` : `🤖 스마트팜 "${name}" 이 멈췄어요. 블록 색을 확인해 보세요`);
@@ -244,8 +275,12 @@ function selectedPlot() {
   return game.state.plots.find((p) => p.id === game.selectedId) ?? null;
 }
 
-function record(action, detail = "", actor = "player") {
-  game.log.push({ at: game.state.meta.gameMinutes, actor, action, detail });
+// 작업 기록 한 줄. 새 기록은 모양을 맞춰요 (docs/learn/04 의 "정리가 필요한 진짜 사례"):
+//   actor: id (player · haneul · idle · system · smartfarm …), detail: JSON 글자 {"plot":3,"species":"tomato"}
+const ACTOR_IDS = new Map([...friends.map((f) => [f.name, f.id]), ["멍때리기", "idle"]]);
+function record(action, detail = {}, actor = "player") {
+  const text = typeof detail === "string" ? detail : JSON.stringify(detail);
+  game.log.push({ at: game.state.meta.gameMinutes, actor: ACTOR_IDS.get(actor) ?? actor, action, detail: text });
 }
 
 // 규칙 함수의 결과({ ok, message })를 알림으로 보여 주고, 성공했으면 기록하고 효과음을 냅니다.
@@ -280,10 +315,17 @@ function sendWorker(plot, task, { quiet = false } = {}) {
     plot,
     task.kind,
     (p, worker) => {
+      const before = p.crop; // 수확하면 사라지니까 미리 봐 둬요
       const result = JOB_RULES[task.kind](p, task);
+      const detail =
+        task.kind === "plant"
+          ? { plot: p.id, species: task.speciesId, color: task.colorId }
+          : task.kind === "harvest"
+            ? { plot: p.id, species: before?.species, count: speciesById.get(before?.species)?.yield ?? 0 }
+            : { plot: p.id, count: 1 };
       const actor = worker.name ?? (idleMode ? "멍때리기" : "player");
       const message = worker.name && result.ok ? `${josa(worker.name, "이가", "가")} 도와줬어요. ${result.message}` : result.message;
-      report({ ...result, message }, task.kind, `${p.id}`, JOB_SOUNDS[task.kind], actor, quiet);
+      report({ ...result, message }, task.kind, detail, JOB_SOUNDS[task.kind], actor, quiet);
     },
     performance.now(),
   );
@@ -355,31 +397,48 @@ const actions = {
     game.ui[key] = value;
     if (redraw) draw();
   },
+  // 도감 라벨 달기 (web/farm/codex.js): 정답과 비교해 알려 주고, 틀려도 등록돼요
+  labelCodex(entryId, draft) {
+    const entry = (game.state.meta.codex ?? []).find((e) => e.id === entryId);
+    if (!entry) return;
+    const result = labelEntry(entry, draft, draft.name ?? "", game.state.meta.gameMinutes);
+    game.ui.relabel = result.score === 3 ? null : entry.id;
+    report({ ok: true, message: result.message }, "label", { id: entry.id, score: result.score }, result.score === 3 ? "harvest" : null);
+    noticeUnlocks();
+  },
+  async refreshJournal() {
+    try {
+      game.journal = await loadJournal();
+    } catch {
+      game.journal = { error: "일지를 읽을 수 없어요. 서버가 켜져 있는지 확인해 주세요." };
+    }
+    draw();
+  },
   // 스마트팜 (web/smartfarm/editor.js) — 고치면 바로 그려요
   sfAddTemplate(templateId) {
     const result = addFromTemplate(game.state.meta.smartfarm, smartfarmTemplates.find((t) => t.id === templateId));
     if (result.ok) game.ui.sfDag = result.dagId;
-    report(result, "smartfarm_edit", templateId);
+    report(result, "smartfarm_edit", { dag: result.dagId ?? templateId });
   },
   sfRemoveDag(dagId) {
-    if (confirm("이 흐름을 지울까요?")) report(removeDag(game.state.meta.smartfarm, dagId), "smartfarm_edit", dagId);
+    if (confirm("이 흐름을 지울까요?")) report(removeDag(game.state.meta.smartfarm, dagId), "smartfarm_edit", { dag: dagId });
   },
   sfTrigger(dagId) {
     const sf = game.state.meta.smartfarm;
     const ok = triggerRun(sf, sf.dags.find((d) => d.id === dagId), game.state.meta.gameMinutes);
-    report({ ok, message: ok ? "▶ 실행을 시작했어요" : "이미 실행 중이에요" }, "smartfarm_run", dagId);
+    report({ ok, message: ok ? "▶ 실행을 시작했어요" : "이미 실행 중이에요" }, "smartfarm_run", { dag: dagId });
     if (ok) runMachines(game.state);
     draw();
   },
-  sfSchedule: (dagId, schedule) => report(setSchedule(game.state.meta.smartfarm, dagId, schedule), "smartfarm_edit", dagId),
-  sfAddTask: (dagId, block) => report(addTask(game.state.meta.smartfarm, dagId, block), "smartfarm_edit", dagId),
-  sfRemoveTask: (dagId, taskId) => report(removeTask(game.state.meta.smartfarm, dagId, taskId), "smartfarm_edit", dagId),
-  sfOption: (dagId, taskId, key, value) => report(setOption(game.state.meta.smartfarm, dagId, taskId, key, value), "smartfarm_edit", dagId),
+  sfSchedule: (dagId, schedule) => report(setSchedule(game.state.meta.smartfarm, dagId, schedule), "smartfarm_edit", { dag: dagId }),
+  sfAddTask: (dagId, block) => report(addTask(game.state.meta.smartfarm, dagId, block), "smartfarm_edit", { dag: dagId }),
+  sfRemoveTask: (dagId, taskId) => report(removeTask(game.state.meta.smartfarm, dagId, taskId), "smartfarm_edit", { dag: dagId }),
+  sfOption: (dagId, taskId, key, value) => report(setOption(game.state.meta.smartfarm, dagId, taskId, key, value), "smartfarm_edit", { dag: dagId }),
   sfEdge(dagId, from, to, on) {
     const sf = game.state.meta.smartfarm;
     const result = on ? connect(sf, dagId, from, to) : disconnect(sf, dagId, from, to);
     if (!result.ok) panelKey = ""; // 거부했으면 눌린 체크 표시를 되돌리려고 메뉴를 다시 그려요
-    report(result, "smartfarm_edit", dagId);
+    report(result, "smartfarm_edit", { dag: dagId });
   },
   // 연구소 (web/lab/sandbox.js)
   labSend: (speciesId, count) => lab.send(speciesId, count),
@@ -416,40 +475,40 @@ const actions = {
       if (helper.dropSound) playSound(helper.dropSound);
       draw();
     };
-    const done = () => report({ ok: count > 0, message: `${helper.name}: ${BULK[kind].label} ${count}칸` }, `bulk:${kind}`, `${count}`);
+    const done = () => report({ ok: count > 0, message: `${helper.name}: ${BULK[kind].label} ${count}칸` }, "bulk", { kind, count });
     playSound(helper.sound);
     animator[helper.run](targets, apply, done, performance.now());
   },
   setBorder(borderId) {
     const plot = selectedPlot();
-    if (setBorder(plot, borderId)) record("decor", `${plot.id}:${borderId}`);
+    if (setBorder(plot, borderId)) record("decor", { plot: plot.id, border: borderId });
     draw();
   },
   borderToKind() {
     const plot = selectedPlot();
     const count = applyBorderToKind(game.state, plot.kind, plot.border);
-    report({ ok: count > 0, message: count ? `${PLOT_NAMES[plot.kind]} ${count}칸의 테두리를 바꿨어요` : "이미 모두 같은 색이에요" }, "decor", `${plot.kind}:${plot.border}`);
+    report({ ok: count > 0, message: count ? `${PLOT_NAMES[plot.kind]} ${count}칸의 테두리를 바꿨어요` : "이미 모두 같은 색이에요" }, "decor", { kind: plot.kind, border: plot.border });
   },
   // 요리: 재료를 꺼내 두고, 농부가 화덕에 가서 보글보글 끓이면 창고에 요리가 들어가요.
   cook(recipeId, { quiet = false } = {}) {
     const recipe = recipes.find((r) => r.id === recipeId);
     const started = startCooking(game.state, recipe);
-    if (!started.ok) return report(started, "cook", recipe.id, null, "player", quiet);
+    if (!started.ok) return report(started, "cook", { recipe: recipe.id }, null, "player", quiet);
     const spot = { x: layout.kitchen.x - 2 - layout.farm.x, y: layout.kitchen.y + 15 - layout.farm.y };
     animator.cook(spot, (worker) => {
       const result = finishCooking(game.state, recipe);
       const who = worker.name ? `${josa(worker.name, "이가", "가")} ` : "";
-      report({ ...result, message: `${who}${result.message}` }, "cook", recipe.id, "cook", worker.name ?? "player", quiet);
+      report({ ...result, message: `${who}${result.message}` }, "cook", { recipe: recipe.id }, "cook", worker.name ?? "player", quiet);
     });
     if (!quiet) showToast(started.message);
     draw();
   },
   // 나눠 먹기: 농부와 친구들이 돗자리에 둘러앉아 맛있게 먹어요. 제일 좋아하는 요리면 머리 위에 ★
   share(recipeId, { quiet = false } = {}) {
-    if (feasting) return report({ ok: false, message: "지금 다 같이 먹고 있어요. 다 먹으면 또 차려 주세요" }, "share", "", null, "player", quiet);
+    if (feasting) return report({ ok: false, message: "지금 다 같이 먹고 있어요. 다 먹으면 또 차려 주세요" }, "share", {}, null, "player", quiet);
     const recipe = recipes.find((r) => r.id === recipeId);
     const result = share(game.state, recipe);
-    if (!result.ok) return report(result, "share", recipe.id, null, "player", quiet);
+    if (!result.ok) return report(result, "share", { recipe: recipe.id }, null, "player", quiet);
     feasting = true;
     const { center, seats } = picnicSeats(layout.picnic);
     const rel = (p) => ({ ...p, x: p.x - layout.farm.x, y: p.y - layout.farm.y });
@@ -462,7 +521,7 @@ const actions = {
       () => {
         feasting = false;
         lastFeastAt = performance.now();
-        report({ ...result, message: shareMessage(recipe, friends) }, "share", recipe.id, "yum", "player", quiet);
+        report({ ...result, message: shareMessage(recipe, friends) }, "share", { recipe: recipe.id }, "yum", "player", quiet);
       },
       fans,
     );
@@ -473,12 +532,12 @@ const actions = {
   craft(id) {
     const craft = crafts.find((c) => c.id === id);
     const started = startCraft(game.state, craft);
-    if (!started.ok) return report(started, "craft", craft.id);
+    if (!started.ok) return report(started, "craft", { craft: craft.id });
     const spot = { x: layout.barn.x + 4 - layout.farm.x, y: layout.barn.y + 34 - layout.farm.y };
     animator.craft(spot, (worker) => {
       const result = finishCraft(game.state, craft);
       const who = worker.name ? `${josa(worker.name, "이가", "가")} ` : "";
-      report({ ...result, message: `${who}${result.message}` }, "craft", craft.id, "craft", worker.name ?? "player");
+      report({ ...result, message: `${who}${result.message}` }, "craft", { craft: craft.id }, "craft", worker.name ?? "player");
     });
     showToast(started.message);
     draw();
@@ -489,13 +548,13 @@ const actions = {
     const craft = crafts.find((c) => c.id === id);
     const friend = friends.find((f) => f.id === friendId);
     const result = giveGift(game.state, craft, friend);
-    if (!result.ok) return report(result, "gift", craft.id);
+    if (!result.ok) return report(result, "gift", { craft: craft.id, friend: friend.id });
     gifting = true;
     const spots = giftSpots(layout.picnic);
     const rel = (p) => ({ ...p, x: p.x - layout.farm.x, y: p.y - layout.farm.y });
     animator.gift({ giver: rel(spots.giver), taker: rel(spots.taker), item: rel(spots.item) }, friend, craft.id, result.loved, () => {
       gifting = false;
-      report(result, "gift", `${craft.id}:${friend.id}`, "gift");
+      report(result, "gift", { craft: craft.id, friend: friend.id, loved: result.loved }, "gift");
     });
     showToast(`${josa(friend.name, "이를", "를")} 불렀어요. ${josa(craft.name.ko, "을", "를")} 들고 기다려요`);
     draw();
@@ -503,7 +562,7 @@ const actions = {
   setTimeScale(scale) {
     tick(); // 지금까지는 이전 배율로 계산하고
     game.state.meta.timeScale = scale; // 지금부터 새 배율로
-    report({ ok: true, message: `시간 배율을 ×${scale}로 바꿨어요` }, "time_scale", String(scale));
+    report({ ok: true, message: `시간 배율을 ×${scale}로 바꿨어요` }, "time_scale", { scale });
   },
   setSound(change) {
     setSound(change);
@@ -522,6 +581,7 @@ const actions = {
     savePrefs();
     draw();
     if (tab === "lab") lab.refresh(); // 연구소는 열 때마다 서버에서 새로 읽어요 (게임 밖에서 고쳤을 수도 있으니까요)
+    if (tab === "journal") save({ silent: true }).then(() => actions.refreshJournal()); // 방금 한 일까지 일지에 보이도록 저장부터
   },
   openTab(tab) {
     if (game.menu.mode === "float") game.menu.floatOpen = !(game.menu.floatOpen && game.tab === tab);
@@ -573,7 +633,7 @@ const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => res
 async function catchUp(fromMs, toMs) {
   const plan = planOffline(fromMs, toMs, game.state.meta.timeScale);
   const notice = plan.clockWentBack || plan.realMs >= AWAY_NOTICE_MS;
-  if (plan.clockWentBack) record("clock_backwards", String(plan.realMs), "system");
+  if (plan.clockWentBack) record("clock_backwards", { ms: plan.realMs }, "system");
   const away = newReport();
   let machineRuns = 0; // 비운 사이 스마트팜이 끝낸 실행 수
   // 새로고침처럼 아주 잠깐 비운 건 친구들이 나서지 않아요. (다 자란 작물은 플레이어가 직접 수확하도록)
@@ -621,6 +681,7 @@ async function tick() {
   lastTick = now;
   advanceFarm(game.state, speciesById, realMsToGameMinutes(elapsed, game.state.meta.timeScale));
   runMachines(game.state);
+  noticeUnlocks();
   if (!idleMode) game.state.meta.playSeconds += elapsed / 1000; // 직접 플레이한 시간 (멍때리기는 빼요)
   noticeWeather();
   updateTip();
@@ -680,6 +741,7 @@ function draw() {
     game.seedChoice,
     game.tab === "lab" && [game.lab, game.labBench, game.ui],
     game.tab === "smartfarm" && [game.state.meta.smartfarm, game.ui],
+    game.tab === "journal" && [game.journal, game.state.meta.codex, game.state.meta.stats, game.state.meta.unlocked, game.ui.relabel],
   ]);
   if (root && key !== panelKey) {
     panelKey = key;
@@ -880,6 +942,7 @@ draw(); // 도구 막대를 먼저 그려야 화면 크기를 맞출 수 있어�
 setIdleMode(idleMode); // 버튼 글자와 화면 크기 맞추기 (fitScreen 포함)
 setTool("look");
 if (game.tab === "lab") lab.refresh();
+if (game.tab === "journal") actions.refreshJournal();
 requestAnimationFrame(animate);
 if (boot.recovery) {
   showToast(
@@ -919,7 +982,7 @@ async function tamperFlow() {
 
 // 게임에 새 작물이 늘었으면 씨앗을 한 번 선물해요 (아래 catchUp 이 끝나면 함께 저장돼요)
 const gifts = giftNewSeeds(game.state, speciesList);
-if (gifts.length) record("gift", gifts.map((s) => s.id).join(","), "system");
+if (gifts.length) record("seed_gift", { species: gifts.map((s) => s.id) }, "system");
 if (game.integrity === "tampered") {
   hideLoading();
   await tamperFlow(); // 초기화되면 페이지를 새로 열어요

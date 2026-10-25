@@ -1,7 +1,8 @@
 // 심기와 수확 규칙입니다.
 // 모든 함수는 { ok, message } 를 돌려줍니다. 화면은 message 를 그대로 보여 주면 돼요.
+import { discover, rollMutation } from "./codex.js";
 import { PLOT_FOR_TYPE, stageOf } from "./crops.js";
-import { addItem, takeItem } from "../state.js";
+import { addItem, addStat, takeItem } from "../state.js";
 import { josa, PLOT_NAMES } from "../text.js";
 
 const START_MOISTURE = 40;
@@ -34,8 +35,17 @@ export function harvest(state, plot, species) {
   if (!plot.crop || stageOf(plot.crop) !== "ripe") {
     return { ok: false, message: "아직 수확할 때가 아니에요" };
   }
+  const traits = rollMutation(state, plot); // 아주 가끔 특별한 작물 (돌연변이) → farm/codex.js
   addItem(state, species.id, species.yield);
   addItem(state, seedId(species.id), species.seeds);
+  addStat(state, "harvests", species.id, species.yield);
   plot.crop = null;
-  return { ok: true, message: `${species.name.ko} ${species.yield}개와 씨앗 ${species.seeds}개를 얻었어요` };
+  let message = `${species.name.ko} ${species.yield}개와 씨앗 ${species.seeds}개를 얻었어요`;
+  let mutant = null;
+  if (traits) {
+    const found = discover(state, species.id, traits, state.meta.gameMinutes);
+    mutant = { species: species.id, traits, isNew: found.isNew };
+    message += ` ✨ 특별한 ${species.name.ko}도 나왔어요!${found.isNew ? " 일지(J)에서 이름표를 달아 주세요" : ""}`;
+  }
+  return { ok: true, message, mutant };
 }

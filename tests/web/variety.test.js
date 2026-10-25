@@ -55,7 +55,13 @@ test("게임 데이터: 모든 작물에 그림이 있고, 요리 재료는 모�
   const ids = crops.map((c) => c.id);
   assert(ids.length >= 14, `작물 ${ids.length}가지`);
   assert(ids.join() === manifest.crops.ids.join(), "manifest 의 작물 그림 목록이 crops.json 과 달라요");
-  assert(recipes.map((r) => r.id).join() === manifest.dishes.join(), "manifest 의 요리 그림 목록이 recipes.json 과 달라요");
+  const { unlocks } = await get("data/unlocks.json");
+  const allRecipes = [...recipes, ...unlocks.filter((u) => u.gives.recipe).map((u) => u.gives.recipe)];
+  assert(allRecipes.map((r) => r.id).join() === manifest.dishes.join(), "manifest 의 요리 그림 목록이 recipes.json + unlocks.json 과 달라요");
+  for (const u of unlocks) {
+    if (u.gives.color) assert(ids.includes(u.gives.color.species), `${u.id} 의 작물`);
+    for (const item of Object.keys(u.gives.recipe?.ingredients ?? {})) assert(ids.includes(item), `${u.id} 의 재료 ${item}`);
+  }
   for (const r of recipes) for (const item of Object.keys(r.ingredients)) assert(ids.includes(item), `${r.id} 의 재료 ${item}`);
   for (const id of ids) assert(start.inventory[`seed_${id}`] > 0, `새 농장에 ${id} 씨앗이 없어요`);
   for (const type of ["field", "paddy", "flower"]) assert(crops.filter((c) => c.type === type).length >= 3, `${type} 작물이 3가지보다 적어요`);

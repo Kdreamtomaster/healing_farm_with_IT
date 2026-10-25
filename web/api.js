@@ -22,6 +22,19 @@ export async function loadSmartfarmTemplates() {
   return (await getJson("/data/smartfarm.json", "스마트팜 틀")).templates;
 }
 
+export function loadMutations() {
+  return getJson("/data/mutations.json", "돌연변이 데이터");
+}
+
+export async function loadUnlocks() {
+  return (await getJson("/data/unlocks.json", "해금 데이터")).unlocks;
+}
+
+// 농장 일지 (원본 → 정리 → 집계) — server/journal.py
+export function loadJournal() {
+  return getJson("/api/journal", "농장 일지");
+}
+
 export async function loadFriends() {
   return (await getJson("/data/friends.json", "친구 데이터")).friends;
 }

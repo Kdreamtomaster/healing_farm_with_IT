@@ -97,7 +97,8 @@ test("안내 문장: 5일 초과와 시계 역행", () => {
 test("작업 기록은 친구별로 묶어서 남긴다", () => {
   const entries = reportToLog({ friends: { haneul: { water: 3, harvest: { tomato: 4 } } } }, 100, FRIENDS);
   assert(entries.length === 2, "물주기 1줄 + 수확 1줄");
-  assert(entries[0].actor === "하늘" && entries[1].detail === "tomato:4");
+  assert(entries[0].actor === "haneul", "화면 이름 대신 id 로 (이름이 바뀌어도 이어지게)");
+  assert(JSON.parse(entries[0].detail).count === 3 && JSON.parse(entries[1].detail).species === "tomato", entries[1].detail);
 });
 
 test("시간 표시", () => {

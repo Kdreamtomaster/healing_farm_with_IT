@@ -7,7 +7,7 @@
 | 01 | [게임 디렉터리와 코드 역할](01-directory-and-code-roles.md) | 프로젝트 전체 | ✔ |
 | 02 | [데이터베이스와 저장소](02-database-and-storage.md) | `server/storage/` | ✔ |
 | 03 | [시간 처리와 방치형 진행](03-time-and-idle-progress.md) | `web/time/` | ✔ |
-| 04 | [데이터 파이프라인과 라벨링](04-data-pipeline-and-labeling.md) | `task_log` 표, `data/` 라벨 | ✔ 일부 (농장 일지·도감은 🚧 6단계) |
+| 04 | [데이터 파이프라인과 라벨링](04-data-pipeline-and-labeling.md) | `task_log` 표, 일지 탭(파이프라인·도감), `data/` 라벨 | ✔ |
 | 05 | [자동화 DAG와 Airflow 개념](05-automation-dag-and-airflow.md) | `web/farm/autopilot.js`, `web/smartfarm/` (자동화 탭) | ✔ |
 | 06 | [내결함성과 데이터 복구](06-fault-tolerance-and-recovery.md) | `server/storage/` | ✔ |
 | 07 | [해시와 데이터 무결성](07-hash-and-integrity.md) | `server/integrity/`, 연구소 지문 실험대 | ✔ |
@@ -15,7 +15,6 @@
 | 09 | [프로덕트 엔지니어링과 기획 원칙](09-product-engineering-principles.md) | `docs/PLAN.md` | ✔ |
 
 - ✔ 표시는 지금 게임과 코드로 바로 확인할 수 있는 내용이에요.
-- 🚧 표시는 아직 만들지 않은 기능이에요. 어떻게 만들지는 [docs/PLAN.md](../PLAN.md)의 6단계 설계에 적어 두었어요.
 
 ## 모든 문서의 짜임
 1. **한 줄 요약**

@@ -16,7 +16,8 @@ REQUIRED_TABLES = {"meta", "plots", "crops", "inventory", "task_log", "integrity
 # 저장 요청으로 브라우저가 바꿀 수 있는 meta 값. 나머지는 서버만 씁니다.
 # knownSpecies: 이 농장이 이미 아는 작물들 (새 작물이 추가되면 씨앗을 한 번 선물하려고 기억해요)
 # smartfarm: 스마트팜 DAG 와 실행 상태 (8단계)
-GAME_META_KEYS = ("gameMinutes", "playSeconds", "timeScale", "knownSpecies", "smartfarm")
+# stats·codex·unlocked: 서명된 집계 숫자, 도감, 열린 해금 (6단계)
+GAME_META_KEYS = ("gameMinutes", "playSeconds", "timeScale", "knownSpecies", "smartfarm", "stats", "codex", "unlocked")
 
 
 def connect(path: Path) -> sqlite3.Connection:

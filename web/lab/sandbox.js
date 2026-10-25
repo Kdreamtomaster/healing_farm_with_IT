@@ -57,7 +57,7 @@ export function createLab(ctx) {
       const result = await labImport(speciesId, count);
       if (!result.ok) return failed(result);
       takeItem(game.state, speciesId, count);
-      ctx.record("lab_send", JSON.stringify({ species: speciesId, count, transfer: result.transfer.id }));
+      ctx.record("lab_send", { species: speciesId, count, transfer: result.transfer.id });
       ctx.showToast(`${nameOf(speciesId)} ${count}개를 연구소로 보냈어요 🧪`);
       ctx.playSound("craft");
       await refresh(result.lab);
@@ -70,7 +70,7 @@ export function createLab(ctx) {
       const result = await labFuel(sampleId, sample.count);
       if (!result.ok) return failed(result);
       addItem(game.state, "biofuel", result.transfer.amount);
-      ctx.record("lab_fuel", JSON.stringify({ count: result.transfer.amount, transfer: result.transfer.id }));
+      ctx.record("lab_fuel", { count: result.transfer.amount, transfer: result.transfer.id });
       ctx.showToast(`바이오 연료 ${result.transfer.amount}개가 농장 창고에 도착했어요 ⛽`);
       ctx.playSound("fuel");
       await refresh(result.lab);

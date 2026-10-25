@@ -1,0 +1,10 @@
+{
+  "chance": 0.03,
+  "secondTraitChance": 0.4,
+  "traits": {
+    "color": { "rainbow": "무지개", "sparkle": "반짝", "pastel": "파스텔" },
+    "shape": { "heart": "하트", "star": "별" },
+    "size": { "big": "큰", "small": "작은" }
+  },
+  "categories": { "color": "색", "shape": "모양", "size": "크기" }
+}

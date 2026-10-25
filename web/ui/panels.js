@@ -1,4 +1,4 @@
-// 위쪽 상태 줄과 오른쪽 메뉴(탭: 밭 · 창고 · 부엌 · 공방 · 연구소 · 자동화 · 설정)를 그립니다.
+// 위쪽 상태 줄과 오른쪽 메뉴(탭: 밭 · 창고 · 부엌 · 공방 · 연구소 · 자동화 · 일지 · 설정)를 그립니다.
 // 버튼을 누르면 actions 의 함수를 부를 뿐, 규칙 계산은 하지 않습니다.
 import { lightAt, partOfDay } from "../decor/daylight.js";
 import { cropColor } from "../decor/palette.js";
@@ -13,6 +13,7 @@ import { josa, PLOT_NAMES, STAGE_NAMES } from "../text.js";
 import { TIME_SCALES } from "../time/clock.js";
 import { el } from "./dom.js";
 import { labTab } from "./lab-panel.js";
+import { journalTab } from "./journal-panel.js";
 import { smartfarmTab } from "./smartfarm-panel.js";
 
 export const TABS = [
@@ -22,6 +23,7 @@ export const TABS = [
   { id: "workshop", icon: "💐", label: "공방", key: "G" },
   { id: "lab", icon: "🧪", label: "연구소", key: "L" },
   { id: "smartfarm", icon: "🤖", label: "자동화", key: "B" },
+  { id: "journal", icon: "📒", label: "일지", key: "J" },
   { id: "settings", icon: "⚙️", label: "설정", key: "O" },
 ];
 
@@ -47,7 +49,7 @@ function weatherIcon(weather, gameMinutes) {
 }
 
 export function renderPanel(root, game, data, actions) {
-  const content = { plot: plotTab, storage: storageTab, kitchen: kitchenTab, workshop: workshopTab, lab: labTab, smartfarm: smartfarmTab, settings: settingsTab }[game.tab] ?? plotTab;
+  const content = { plot: plotTab, storage: storageTab, kitchen: kitchenTab, workshop: workshopTab, lab: labTab, smartfarm: smartfarmTab, journal: journalTab, settings: settingsTab }[game.tab] ?? plotTab;
   root.replaceChildren(
     el(
       "nav",
@@ -231,6 +233,12 @@ function storageTab(game, data) {
     section("🌱 씨앗", seeds, "씨앗이 없어요. 수확하면 씨앗도 얻어요."),
     section("🍲 요리", dishes, "요리가 없어요. 부엌에서 만들어 보세요."),
     section("💐 공방 물건", crafted, "꽃으로 만든 물건이 없어요. 공방에서 만들어 보세요."),
+    (state.meta.codex ?? []).length > 0 &&
+      section(
+        "✨ 특별한 작물",
+        state.meta.codex.map((e) => tile(data.icons.mutant(e.species, e.truth), e.name || data.speciesById.get(e.species)?.name.ko, itemCount(state, `mutant_${e.id}`))),
+        "",
+      ),
     itemCount(state, "biofuel") > 0 && section("⛽ 바이오 연료", [tile(data.icons.fuel(), "바이오 연료", itemCount(state, "biofuel"))], ""),
   ];
 }

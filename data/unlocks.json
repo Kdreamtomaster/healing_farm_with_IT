@@ -1,0 +1,40 @@
+{
+  "unlocks": [
+    {
+      "id": "chocolate_cosmos",
+      "name": "초콜릿 코스모스",
+      "needs": { "playMinutes": 30 },
+      "gives": { "color": { "species": "cosmos", "id": "chocolate", "name": "초콜릿", "hex": "#6a3a2a" } }
+    },
+    {
+      "id": "blue_tulip",
+      "name": "파란 튤립",
+      "needs": { "harvests": 30 },
+      "gives": { "color": { "species": "tulip", "id": "blue", "name": "파랑", "hex": "#5a7ee0" } }
+    },
+    {
+      "id": "blue_lotus",
+      "name": "푸른 연꽃",
+      "needs": { "codex": 1 },
+      "gives": { "color": { "species": "lotus", "id": "blue", "name": "푸른", "hex": "#7a9ae8" } }
+    },
+    {
+      "id": "strawberry_tart",
+      "name": "딸기 타르트 레시피",
+      "needs": { "cooked": 5 },
+      "gives": { "recipe": { "id": "strawberry_tart", "name": { "ko": "딸기 타르트", "en": "Strawberry Tart" }, "ingredients": { "strawberry": 3, "corn": 1 } } }
+    },
+    {
+      "id": "pumpkin_pie",
+      "name": "호박 파이 레시피",
+      "needs": { "crafted": 3, "gifts": 2 },
+      "gives": { "recipe": { "id": "pumpkin_pie", "name": { "ko": "호박 파이", "en": "Pumpkin Pie" }, "ingredients": { "pumpkin": 2, "potato": 1 } } }
+    },
+    {
+      "id": "purple_corn",
+      "name": "보라 옥수수",
+      "needs": { "harvests": 80, "playMinutes": 90 },
+      "gives": { "color": { "species": "corn", "id": "purple", "name": "보라", "hex": "#7a4a9a" } }
+    }
+  ]
+}

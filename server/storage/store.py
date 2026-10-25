@@ -113,6 +113,13 @@ class FarmStore:
                 backup.snapshot(conn, self.backups_dir, now)
         return True
 
+    def journal(self, friends: list) -> dict:
+        """농장 일지 (원본 → 정리 → 집계). server/journal.py"""
+        import journal
+
+        with self._lock, closing(db.connect(self.db_path)) as conn:
+            return journal.build(conn, friends)
+
     def transfers(self) -> list:
         with self._lock, closing(db.connect(self.db_path)) as conn:
             return db.read_state(conn).get("transfers", [])

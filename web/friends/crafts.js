@@ -2,7 +2,7 @@
 //   꾸미기(decor): 창고에 있으면 마당의 정해진 자리(spot)에 저절로 놓여요
 //   선물(gift): 친구에게 주면 창고에서 빠지고, 친구가 좋아하는 꽃이 들어 있으면 ★
 // 공방 물건은 창고에 craft_물건이름 으로 들어가요. 모든 함수는 { ok, message } 를 돌려줍니다.
-import { addItem, itemCount, takeItem } from "../state.js";
+import { addItem, addStat, itemCount, takeItem } from "../state.js";
 import { josa } from "../text.js";
 
 export const craftId = (id) => `craft_${id}`;
@@ -24,6 +24,7 @@ export function startCraft(state, craft) {
 
 export function finishCraft(state, craft) {
   addItem(state, craftId(craft.id));
+  addStat(state, "crafted");
   const where = craft.kind === "decor" ? " 마당에 놓아 두었어요" : " 창고에 넣어 두었어요";
   return { ok: true, message: `${josa(craft.name.ko, "을", "를")} 만들어${where}` };
 }
@@ -36,6 +37,7 @@ export function giveGift(state, craft, friend) {
   const to = josa(friend.name, "이에게", "에게"); // 하늘이에게, 바다에게
   if (craft.kind !== "gift") return { ok: false, message: `${josa(name, "은", "는")} 선물용이 아니에요` };
   if (!takeItem(state, craftId(craft.id))) return { ok: false, message: `${josa(name, "이", "가")} 없어요` };
+  addStat(state, "gifts");
   const loved = lovesGift(craft, friend);
   const reply = loved ? `제일 좋아하는 꽃이래요 ★` : `고마워해요 ♥`;
   return { ok: true, loved, message: `${to} ${josa(name, "을", "를")} 선물했어요. ${reply}` };
