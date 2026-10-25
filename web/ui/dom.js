@@ -9,6 +9,7 @@ export function el(tag, props = {}, ...children) {
     else if (value === true) node.setAttribute(key, "");
     else if (value !== false && value != null) node.setAttribute(key, value);
   }
-  node.append(...children.flat().filter((child) => child != null && child !== false));
+  // 목록 안의 목록도 끝까지 풀어서 넣어요 (탭 내용처럼 여러 겹으로 만든 화면)
+  node.append(...children.flat(Infinity).filter((child) => child != null && child !== false));
   return node;
 }

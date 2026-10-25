@@ -12,14 +12,23 @@
       <span id="clock"></span>
       <span id="integrity-badge" class="badge" hidden>⚠ 무결성 이상: 저장이 잠겼어요</span>
       <span class="spacer"></span>
-      <button id="idle-btn" class="ghost">🍃 멍때리기</button>
+      <button id="idle-btn" class="ghost">🍃 멍때리기 <kbd>M</kbd></button>
       <span id="save-status"></span>
-      <button id="save-btn">저장</button>
+      <button id="save-btn">저장 <kbd>Ctrl+S</kbd></button>
+      <button id="help-btn" class="ghost" aria-label="조작 방법">? </button>
     </header>
     <main>
-      <canvas id="farm"></canvas>
+      <section id="stage">
+        <div id="farm-wrap">
+          <canvas id="farm" aria-label="농장. 칸을 누르면 지금 도구로 일해요. 방향키로 칸을 고를 수 있어요."></canvas>
+          <aside id="float-menu" hidden></aside>
+        </div>
+        <div id="toolbar" role="toolbar" aria-label="도구"></div>
+      </section>
       <aside id="panel"></aside>
     </main>
+    <div id="tip" hidden></div>
+    <div id="help" hidden></div>
     <div id="toast" role="status"></div>
     <div id="loading" hidden>
       <div class="loading-box">

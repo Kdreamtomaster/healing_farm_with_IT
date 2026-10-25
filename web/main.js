@@ -1,14 +1,16 @@
 // 게임 시작점: 데이터와 세이브를 불러와 비운 시간을 처리하고, 1초마다 농장의 시간을 흘려보냅니다.
+// 마우스·키보드 조작, 도구, 메뉴(옆에 붙이기 · 팝업 · 새 창)도 여기서 이어 줘요.
 import { loadFriends, loadManifest, loadPalette, loadRecipes, loadSpecies, loadState, saveState } from "./api.js";
+import { isRestTime, lightAt } from "./decor/daylight.js";
 import { applyBorderToKind, setBorder } from "./decor/plots-style.js";
-import { BULK, bulkTargets, flood, water } from "./farm/care.js";
-import { advanceFarm } from "./farm/crops.js";
-import { lightAt, isRestTime } from "./decor/daylight.js";
 import { seasonOf } from "./decor/season.js";
 import { nextKitchenTask, nextTask } from "./farm/autopilot.js";
+import { BULK, bulkTargets, flood, water } from "./farm/care.js";
+import { advanceFarm } from "./farm/crops.js";
+import { harvest, plant } from "./farm/harvest.js";
+import { cycleColor, cycleSeed, seedFor, smartTask, toolTask } from "./farm/tools.js";
 import { farmSeed, weatherAt } from "./farm/weather.js";
 import { fansOf, finishCooking, share, shareMessage, startCooking } from "./friends/cooking.js";
-import { harvest, plant } from "./farm/harvest.js";
 import { playSound, setNatureEnv, setSound, unlockAudio } from "./sound/engine.js";
 import { josa, PLOT_NAMES } from "./text.js";
 import { startAutosave } from "./time/autosave.js";
@@ -17,12 +19,18 @@ import { newReport, planOffline, simulateOffline } from "./time/offline.js";
 import { reportToLog, summarize } from "./time/summary.js";
 import { createAnimator } from "./ui/animations.js";
 import { catRect, createCat, petCat } from "./ui/critters.js";
-import { hideLoading, showProgress, showSummary } from "./ui/loading.js";
-import { renderHeader, renderPanel } from "./ui/panels.js";
+import { el } from "./ui/dom.js";
+import { renderHelp } from "./ui/help.js";
+import { createIcons, toolCursor } from "./ui/icons.js";
+import { commandForKey, MOVES, moveCursor } from "./ui/keys.js";
 import { computeLayout, fitZoom, picnicSeats } from "./ui/layout.js";
+import { hideLoading, showProgress, showSummary } from "./ui/loading.js";
+import { plotSummary, renderHeader, renderPanel } from "./ui/panels.js";
 import { drawFarm, plotAt } from "./ui/renderer.js";
 import { loadSprites } from "./ui/sprites.js";
 import { showToast } from "./ui/toast.js";
+import { renderToolbar } from "./ui/toolbar.js";
+import { hideTip, showTip } from "./ui/tooltip.js";
 
 // 이만큼 넘게 시간이 비면(컴퓨터 잠자기 등) 플레이 중이 아니라 "비운 시간"으로 보고 친구들이 돌봐요.
 const AWAY_GAP_MS = 2 * 60 * 1000;
@@ -33,7 +41,9 @@ const FRAME_MS = 1000 / 24; // 1초에 24번 다시 그려요 (도트 느낌은 
 
 const canvas = document.getElementById("farm");
 const ctx = canvas.getContext("2d");
-const panel = document.getElementById("panel");
+const toolbar = document.getElementById("toolbar");
+const floatMenu = document.getElementById("float-menu");
+const helpBox = document.getElementById("help");
 
 const [speciesList, friends, recipes, palette, manifest, boot] = await Promise.all([
   loadSpecies(),
@@ -45,18 +55,44 @@ const [speciesList, friends, recipes, palette, manifest, boot] = await Promise.a
 ]);
 const sprites = await loadSprites(manifest);
 const speciesById = new Map(speciesList.map((s) => [s.id, s]));
-const data = { speciesList, speciesById, palette, recipes };
+const icons = createIcons(sprites, speciesById);
+const data = { speciesList, speciesById, palette, recipes, friends, icons };
 let feasting = false; // 나눠 먹는 중에는 또 상을 차리지 않아요
 const animator = createAnimator(friends); // 농부(바쁘면 친구들이 도우러 와요), 드론, 스프링클러, 물길 연출
 const cat = createCat(); // 헛간 옆 고양이
 data.isPending = (plotId) => animator.isPending(plotId);
 
+// ── 이 컴퓨터에서의 취향 (고른 탭, 고른 씨앗, 메뉴 접기) — 세이브가 아니라 브라우저에 보관 ──
+const PREFS_KEY = "healing-farm-prefs";
+function loadPrefs() {
+  try {
+    return JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}");
+  } catch {
+    return {};
+  }
+}
+function savePrefs() {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ tab: game.tab, seedChoice: game.seedChoice, seedFocus: game.seedFocus, folded: game.menu.folded }));
+  } catch {
+    // 저장이 막혀 있어도 지금 화면에서는 그대로 써요
+  }
+}
+const prefs = loadPrefs();
+
 const game = {
   state: boot.state,
   integrity: boot.integrity,
-  selectedId: null,
+  selectedId: null, // 고른 칸 (키보드 커서)
+  hoverId: null, // 마우스가 올라가 있는 칸
   preview: null, // 심기 전 미리보기 { plotId, speciesId, colorId }
   log: [], // 아직 서버에 보내지 않은 작업 기록
+  tool: "look",
+  seedChoice: prefs.seedChoice ?? {}, // 칸 종류마다 심을 씨앗 { field: { speciesId, colorId }, … }
+  seedFocus: speciesById.has(prefs.seedFocus) ? prefs.seedFocus : speciesList[0].id, // 도구 막대에 보이는 씨앗
+  tab: prefs.tab ?? "plot",
+  // 메뉴: dock(옆에 붙이기) · float(농장 위 팝업) · window(새 창)
+  menu: { mode: "dock", floatOpen: false, folded: Boolean(prefs.folded) },
 };
 
 // 농장 상태가 몇 시(현실 시각, ms)까지 계산되어 있는지
@@ -65,7 +101,6 @@ let busy = false; // 비운 시간을 처리하는 동안에는 1초 시계를 �
 
 // ── 멍때리기 모드 ──
 // 농부들이 알아서 수확하고, 물 주고, 씨앗을 심어요 (작물과 색은 무작위). 메뉴는 숨기고 농장을 크게 보여 줘요.
-// 켜 두었는지는 이 컴퓨터의 취향이라 브라우저에 보관해요.
 const IDLE_KEY = "healing-farm-idle";
 const IDLE_STEP_MS = 1200; // 이만큼마다 할 일을 하나씩 찾아요
 const IDLE_MAX_JOBS = 3; // 한꺼번에 맡기는 일은 이만큼까지 (느긋하게)
@@ -84,7 +119,7 @@ function setIdleMode(on) {
     // 저장이 안 돼도 지금 화면에서는 바뀌어요
   }
   document.body.classList.toggle("idle-mode", on);
-  document.getElementById("idle-btn").textContent = on ? "🍃 멍때리기 끝내기" : "🍃 멍때리기";
+  document.getElementById("idle-btn").replaceChildren(on ? "🍃 멍때리기 끝내기 " : "🍃 멍때리기 ", el("kbd", {}, "M"));
   fitScreen();
 }
 
@@ -106,28 +141,70 @@ function idleStep() {
   if (task) sendWorker(task.plot, task, { quiet: true });
 }
 
-// ── 반응형 화면 ──
-// 가로로 넓은 화면(16:9 PC)은 농장 옆에 메뉴, 세로 화면(9:16, 갤럭시 S25)이나 좁은 화면은 농장 아래에 메뉴.
-// 세로 화면에서는 창고 마당도 밭 아래로 옮겨서 폭을 좁혀요.
-const SIDE_PANEL_MIN_WIDTH = 1000; // 이보다 좁으면 메뉴를 아래로
+// ── 메뉴를 새 창으로 (다른 모니터로 옮겨 쓰기) ──
+let menuWindow = null;
+
+function popOutMenu() {
+  if (menuWindow && !menuWindow.closed) return menuWindow.focus();
+  menuWindow = window.open("/web/menu.html", "healing-farm-menu", "popup,width=420,height=820");
+  if (!menuWindow) showToast("새 창이 막혔어요. 브라우저에서 이 사이트의 팝업을 허용해 주세요");
+}
+
+// menu.html 이 다 열리면 알려 와요 → 그때부터 메뉴를 그 창에 그려요
+addEventListener("message", (event) => {
+  if (event.origin !== location.origin || event.source !== menuWindow) return;
+  if (event.data?.type === "menu-ready") {
+    menuWindow.addEventListener("keydown", handleKey);
+    menuWindow.addEventListener("pointerdown", unlockAudio);
+    refreshMenu();
+  }
+});
+// 새 창을 닫으면 메뉴가 원래 자리로 돌아와요. 농장 창을 닫으면 메뉴 창도 함께 닫아요.
+setInterval(() => {
+  if (menuWindow?.closed) {
+    menuWindow = null;
+    refreshMenu();
+  }
+}, 700);
+addEventListener("pagehide", () => menuWindow?.close());
+
+// ── 반응형 화면과 메뉴 자리 ──
+// 넓은 가로 화면(16:9 PC)은 메뉴를 옆에 붙이고(dock), 접었거나 좁은·세로 화면이면 농장 위 팝업(float)으로,
+// 새 창으로 띄웠으면(window) 농장만 크게 보여요.
+const DOCK_MIN_WIDTH = 1000;
 const PANEL_WIDTH = 360;
 let layout;
 
+function menuMode() {
+  if (menuWindow && !menuWindow.closed) return "window";
+  const wide = innerWidth >= DOCK_MIN_WIDTH && innerWidth > innerHeight;
+  return wide && !game.menu.folded && !idleMode ? "dock" : "float";
+}
+
 function fitScreen() {
+  game.menu.mode = menuMode();
+  document.body.classList.toggle("menu-float", game.menu.mode === "float");
+  document.body.classList.toggle("menu-window-open", game.menu.mode === "window");
   const portrait = innerHeight > innerWidth;
-  const side = !portrait && innerWidth >= SIDE_PANEL_MIN_WIDTH && !idleMode;
-  document.body.classList.toggle("stacked", !side);
   layout = computeLayout(game.state.plots, portrait);
   canvas.width = layout.width;
   canvas.height = layout.height;
   const header = document.querySelector("header").offsetHeight;
-  const availableWidth = innerWidth - 32 - (side ? PANEL_WIDTH + 16 : 0);
-  const availableHeight = side || idleMode ? innerHeight - header - 32 : (innerHeight - header) * (portrait ? 0.55 : 0.75);
+  const bar = idleMode ? 0 : toolbar.offsetHeight + 8;
+  const availableWidth = innerWidth - 40 - (game.menu.mode === "dock" ? PANEL_WIDTH + 16 : 0);
+  const availableHeight = innerHeight - header - bar - 32;
   const zoom = fitZoom(layout, availableWidth, availableHeight);
   canvas.style.width = `${Math.floor(layout.width * zoom)}px`;
 }
-addEventListener("resize", fitScreen);
-setIdleMode(idleMode); // 버튼 글자와 화면 크기 맞추기 (fitScreen 포함)
+
+function refreshMenu() {
+  fitScreen();
+  panelKey = "";
+  toolbarKey = "";
+  draw();
+}
+
+addEventListener("resize", refreshMenu);
 
 function selectedPlot() {
   return game.state.plots.find((p) => p.id === game.selectedId) ?? null;
@@ -140,7 +217,7 @@ function record(action, detail = "", actor = "player") {
 // 규칙 함수의 결과({ ok, message })를 알림으로 보여 주고, 성공했으면 기록하고 효과음을 냅니다.
 //   quiet: 멍때리기 모드처럼 알림 글은 띄우지 않고 소리와 기록만
 function report(result, action, detail, sound, actor = "player", quiet = false) {
-  if (!quiet) showToast(result.message);
+  if (!quiet && result.message) showToast(result.message);
   if (result.ok) {
     record(action, detail, actor);
     if (sound) playSound(sound);
@@ -159,7 +236,7 @@ const JOB_RULES = {
 const JOB_SOUNDS = { plant: "plant", water: "water", flood: "water", harvest: "harvest" };
 
 // 칸에 사람을 보내 일을 맡겨요. 농부가 바쁘면 친구가 도우러 오고, 친구가 한 일은 친구 이름으로 알리고 기록해요.
-//   quiet: 멍때리기 모드처럼 알림 없이 조용히 (효과음과 기록은 남아요)
+//   quiet: 멍때리기 모드나 여러 칸을 끌어서 일할 때처럼 알림 글 없이 (효과음과 기록은 남아요)
 function sendWorker(plot, task, { quiet = false } = {}) {
   if (animator.isPending(plot.id)) {
     if (!quiet) report({ ok: false, message: "이 칸에는 벌써 일하러 가고 있어요" });
@@ -170,26 +247,62 @@ function sendWorker(plot, task, { quiet = false } = {}) {
     task.kind,
     (p, worker) => {
       const result = JOB_RULES[task.kind](p, task);
-      const actor = worker.name ?? (quiet ? "멍때리기" : "player");
-      if (quiet) {
-        if (result.ok) {
-          record(task.kind, `${p.id}`, actor);
-          playSound(JOB_SOUNDS[task.kind]);
-        }
-        draw();
-        return;
-      }
+      const actor = worker.name ?? (idleMode ? "멍때리기" : "player");
       const message = worker.name && result.ok ? `${josa(worker.name, "이가", "가")} 도와줬어요. ${result.message}` : result.message;
-      report({ ...result, message }, task.kind, `${p.id}`, JOB_SOUNDS[task.kind], actor);
+      report({ ...result, message }, task.kind, `${p.id}`, JOB_SOUNDS[task.kind], actor, quiet);
     },
     performance.now(),
   );
   draw();
 }
 
+// 지금 든 도구(또는 "알맞은 일")로 이 칸에 일하기
+//   painting: 마우스를 끌며 여러 칸에 일하는 중 → 할 수 없는 칸은 조용히 건너뛰어요
+function workOn(plot, { smart = false, painting = false } = {}) {
+  const task = smart ? smartTask(plot, game.state, speciesList, game.seedChoice) : toolTask(game.tool, plot, game.state, speciesList, game.seedChoice);
+  if (!task.kind) {
+    if (!painting && task.reason) showToast(task.reason);
+    return;
+  }
+  if (animator.isPending(plot.id)) {
+    if (!painting) showToast("이 칸에는 벌써 일하러 가고 있어요");
+    return;
+  }
+  sendWorker(plot, task, { quiet: painting });
+}
+
+const BULK_HELPERS = {
+  thirsty: { run: "drone", name: "드론", sound: "drone", dropSound: "drip" },
+  highWater: { run: "sprinklers", name: "스프링클러", sound: "sprinkler" },
+  paddy: { run: "flow", name: "물길", sound: "flow" },
+};
+
+// 도구 바꾸기: 마우스 모양도 그 도구로 바뀌어요
+const cursors = {};
+async function setTool(tool) {
+  game.tool = tool;
+  game.preview = null;
+  cursors[tool] ??= await toolCursor(tool);
+  if (game.tool === tool) canvas.style.cursor = cursors[tool];
+  draw();
+}
+
+function setSeedFocus(speciesId, choice) {
+  game.seedFocus = speciesId;
+  game.seedChoice = choice;
+  savePrefs();
+  if (game.tool !== "seed") setTool("seed");
+  else draw();
+}
+
 const actions = {
   plant(speciesId, colorId) {
     game.preview = null;
+    const species = speciesById.get(speciesId);
+    // 메뉴에서 고른 씨앗은 씨앗 도구(3)에도 기억해 둬요
+    game.seedChoice = { ...game.seedChoice, [selectedPlot().kind]: { speciesId, colorId } };
+    game.seedFocus = species.id;
+    savePrefs();
     sendWorker(selectedPlot(), { kind: "plant", speciesId, colorId });
   },
   preview(speciesId, colorId) {
@@ -203,6 +316,10 @@ const actions = {
   },
   harvest() {
     sendWorker(selectedPlot(), { kind: "harvest" });
+  },
+  smartSelected() {
+    const plot = selectedPlot();
+    if (plot) workOn(plot, { smart: true });
   },
   // 일괄 관리는 기계가 도와줘요: 목마른 작물은 드론, 물 많이 먹는 작물은 스프링클러, 논은 물길
   bulk(kind) {
@@ -276,12 +393,35 @@ const actions = {
   setSound(change) {
     setSound(change);
   },
-};
-
-const BULK_HELPERS = {
-  thirsty: { run: "drone", name: "드론", sound: "drone", dropSound: "drip" },
-  highWater: { run: "sprinklers", name: "스프링클러", sound: "sprinkler" },
-  paddy: { run: "flow", name: "물길", sound: "flow" },
+  setTool,
+  cycleSeed(step) {
+    const { choice, speciesId } = cycleSeed(game.seedChoice, speciesList, game.seedFocus, step);
+    setSeedFocus(speciesId, choice);
+  },
+  cycleColor() {
+    setSeedFocus(game.seedFocus, cycleColor(game.seedChoice, speciesList, game.seedFocus));
+  },
+  // 탭 고르기: 메뉴가 붙어 있으면 탭만 바꾸고, 팝업이면 열고 닫아요 (같은 탭을 다시 누르면 닫혀요)
+  setTab(tab) {
+    game.tab = tab;
+    savePrefs();
+    draw();
+  },
+  openTab(tab) {
+    if (game.menu.mode === "float") game.menu.floatOpen = !(game.menu.floatOpen && game.tab === tab);
+    if (game.menu.mode === "window") menuWindow.focus();
+    actions.setTab(tab);
+  },
+  toggleMenu() {
+    if (game.menu.mode === "window") return menuWindow.focus();
+    game.menu.folded = game.menu.mode === "dock";
+    game.menu.floatOpen = false;
+    savePrefs();
+    refreshMenu();
+    showToast(game.menu.folded ? "메뉴를 접었어요. 탭 키(P·I·K·O)를 누르면 팝업으로 열려요" : "메뉴를 폈어요");
+  },
+  popOutMenu,
+  toggleHelp,
 };
 
 async function save({ silent = false, keepalive = false } = {}) {
@@ -357,6 +497,7 @@ async function tick() {
   advanceFarm(game.state, speciesById, realMsToGameMinutes(elapsed, game.state.meta.timeScale));
   if (!idleMode) game.state.meta.playSeconds += elapsed / 1000; // 직접 플레이한 시간 (멍때리기는 빼요)
   noticeWeather();
+  updateTip();
   draw();
 }
 
@@ -383,14 +524,27 @@ setNatureEnv(() => {
   return { night: lightAt(minutes).night, raining: weatherAt(minutes, farmSeed(game.state)) === "rain", season: seasonOf(minutes).id };
 });
 
-// 패널은 보이는 내용이 바뀔 때만 다시 만듭니다. 매초 다시 만들면 누르던 버튼이 사라질 수 있어요.
+// ── 화면 다시 그리기 ──
+// 메뉴와 도구 막대는 보이는 내용이 바뀔 때만 다시 만듭니다. 매초 다시 만들면 누르던 버튼이 사라질 수 있어요.
 let panelKey = "";
+let toolbarKey = "";
+
+function menuRoot() {
+  if (game.menu.mode === "window") return menuWindow?.document.getElementById("panel") ?? null;
+  if (game.menu.mode === "float") return game.menu.floatOpen ? floatMenu : null;
+  return document.getElementById("panel");
+}
 
 function draw() {
   renderHeader(game, palette);
   const plot = selectedPlot();
   const crop = plot?.crop;
+  const root = menuRoot();
+  floatMenu.hidden = !(game.menu.mode === "float" && game.menu.floatOpen);
   const key = JSON.stringify([
+    game.menu.mode,
+    game.menu.floatOpen,
+    game.tab,
     game.selectedId,
     plot?.border,
     plot && animator.isPending(plot.id),
@@ -398,10 +552,23 @@ function draw() {
     game.state.inventory,
     game.state.meta.timeScale,
   ]);
-  if (key !== panelKey) {
+  if (root && key !== panelKey) {
     panelKey = key;
-    renderPanel(panel, game, data, actions);
+    renderPanel(root, game, data, actions);
+    if (root === floatMenu) {
+      root.prepend(el("button", { class: "close small ghost", "aria-label": "메뉴 닫기", onclick: closeFloatMenu }, "✕"));
+    }
   }
+  const barKey = JSON.stringify([game.tool, game.seedFocus, game.seedChoice, game.state.inventory, game.menu, game.tab]);
+  if (barKey !== toolbarKey) {
+    toolbarKey = barKey;
+    renderToolbar(toolbar, game, data, actions);
+  }
+}
+
+function closeFloatMenu() {
+  game.menu.floatOpen = false;
+  draw();
 }
 
 // 농장 그림은 따로 다시 그려요 (흔들리는 작물, 계절 효과, 물주기 연출)
@@ -410,28 +577,168 @@ function animate(time) {
   if (time - lastFrame >= FRAME_MS) {
     lastFrame = time;
     animator.update(time);
-    drawFarm(ctx, { ...data, layout, sprites, animator, cat, state: game.state, selectedId: game.selectedId, preview: game.preview, time });
+    drawFarm(ctx, { ...data, layout, sprites, animator, cat, state: game.state, selectedId: game.selectedId, hoverId: game.hoverId, preview: game.preview, time });
   }
   requestAnimationFrame(animate);
 }
 
-canvas.addEventListener("click", (event) => {
+// ── 마우스: 누르기·끌기·오른쪽 클릭·올리기·휠 ──
+let drag = null; // 끌며 일하는 중 { smart, visited }
+let pointer = null; // 마지막 마우스 위치 (정보 카드를 다시 그릴 때)
+
+function farmPoint(event) {
   const rect = canvas.getBoundingClientRect();
-  const x = ((event.clientX - rect.left) * canvas.width) / rect.width;
-  const y = ((event.clientY - rect.top) * canvas.height) / rect.height;
+  const border = 4; // 캔버스 테두리 두께(px)
+  const x = ((event.clientX - rect.left - border) * canvas.width) / (rect.width - border * 2);
+  const y = ((event.clientY - rect.top - border) * canvas.height) / (rect.height - border * 2);
+  return { x, y, plot: plotAt(game.state.plots, x - layout.farm.x, y - layout.farm.y) };
+}
+
+canvas.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0 && event.button !== 2) return;
+  const { x, y, plot } = farmPoint(event);
   // 고양이를 누르면 쓰다듬어 줘요 (가르릉 ♥)
   const c = catRect(layout);
-  if (x >= c.x && x < c.x + c.w && y >= c.y && y < c.y + c.h) {
+  if (event.button === 0 && x >= c.x && x < c.x + c.w && y >= c.y && y < c.y + c.h) {
     petCat(cat, performance.now());
     playSound("purr");
     return;
   }
-  game.selectedId = plotAt(game.state.plots, x - layout.farm.x, y - layout.farm.y)?.id ?? null;
-  game.preview = null;
+  if (!plot) {
+    if (game.tool === "look") game.selectedId = null;
+    return draw();
+  }
+  game.selectedId = plot.id;
+  const smart = event.button === 2;
+  if (smart || game.tool !== "look") {
+    workOn(plot, { smart });
+    drag = { smart, visited: new Set([plot.id]) };
+    canvas.setPointerCapture(event.pointerId);
+  } else if (game.menu.mode === "float" && !game.menu.floatOpen) {
+    // 살펴보기 도구로 누르면 메뉴가 접혀 있어도 그 칸 정보를 팝업으로 보여 줘요
+    game.tab = "plot";
+    game.menu.floatOpen = true;
+  } else {
+    game.tab = "plot";
+  }
   draw();
 });
+
+canvas.addEventListener("pointermove", (event) => {
+  const { plot } = farmPoint(event);
+  pointer = event.pointerType === "mouse" ? { x: event.clientX, y: event.clientY } : null;
+  game.hoverId = plot?.id ?? null;
+  // 씨앗 도구면 빈 칸에 심을 모습을 미리 보여 줘요
+  const seed = plot && !plot.crop && game.tool === "seed" ? seedFor(plot, game.state, speciesList, game.seedChoice) : null;
+  game.preview = seed ? { plotId: plot.id, ...seed } : null;
+  updateTip();
+  if (drag && plot && !drag.visited.has(plot.id)) {
+    drag.visited.add(plot.id);
+    game.selectedId = plot.id;
+    workOn(plot, { smart: drag.smart, painting: true });
+  }
+});
+
+const endDrag = () => {
+  drag = null;
+};
+canvas.addEventListener("pointerup", endDrag);
+canvas.addEventListener("pointercancel", endDrag);
+canvas.addEventListener("pointerleave", () => {
+  game.hoverId = null;
+  if (game.tool === "seed") game.preview = null;
+  pointer = null;
+  hideTip();
+});
+canvas.addEventListener("contextmenu", (event) => event.preventDefault()); // 오른쪽 클릭은 "알맞은 일"
+canvas.addEventListener(
+  "wheel",
+  (event) => {
+    if (game.tool !== "seed") return;
+    event.preventDefault();
+    const step = Math.sign(event.deltaY || event.deltaX);
+    if (event.shiftKey) actions.cycleColor();
+    else actions.cycleSeed(step);
+  },
+  { passive: false },
+);
+
+// 마우스가 올라간 칸의 정보 카드 (작물이 자라는 게 보이도록 1초마다 새로 그려요)
+function updateTip() {
+  const plot = game.state.plots.find((p) => p.id === game.hoverId);
+  if (!plot || !pointer || drag) return hideTip();
+  showTip(plotSummary(plot, data), pointer.x, pointer.y);
+}
+
+// ── 키보드 ──
+function toggleHelp() {
+  if (helpBox.hidden) renderHelp(helpBox, toggleHelp);
+  helpBox.hidden = !helpBox.hidden;
+}
+
+const COMMANDS = {
+  use() {
+    if (game.selectedId === null) game.selectedId = moveCursor(game.state.plots, null, 0, 0);
+    workOn(selectedPlot(), { smart: game.tool === "look" });
+  },
+  smart() {
+    if (game.selectedId === null) game.selectedId = moveCursor(game.state.plots, null, 0, 0);
+    workOn(selectedPlot(), { smart: true });
+  },
+  "seed:prev": () => actions.cycleSeed(-1),
+  "seed:next": () => actions.cycleSeed(1),
+  "seed:color": () => actions.cycleColor(),
+  "menu:toggle": () => actions.toggleMenu(),
+  "menu:window": () => popOutMenu(),
+  idle: () => setIdleMode(!idleMode),
+  save: () => save(),
+  help: () => toggleHelp(),
+  cancel() {
+    if (!helpBox.hidden) return toggleHelp();
+    if (game.menu.mode === "float" && game.menu.floatOpen) return closeFloatMenu();
+    if (game.tool !== "look") return setTool("look");
+    game.selectedId = null;
+    draw();
+  },
+};
+
+function runCommand(command) {
+  const [name, arg] = command.split(":");
+  if (MOVES[name]) {
+    game.selectedId = moveCursor(game.state.plots, game.selectedId, ...MOVES[name]);
+    return draw();
+  }
+  if (name === "tool") return setTool(arg);
+  if (name === "bulk") return actions.bulk(arg);
+  if (name === "tab") return actions.openTab(arg);
+  COMMANDS[command]?.();
+}
+
+function handleKey(event) {
+  // 안내 화면이 떠 있으면 Enter·Space·Esc 로 닫아요
+  const close = document.getElementById("loading-close");
+  if (!document.getElementById("loading").hidden) {
+    if (!close.hidden && ["Enter", " ", "Escape"].includes(event.key)) {
+      event.preventDefault();
+      close.click();
+    }
+    return;
+  }
+  // 도움말이 떠 있을 때는 닫는 키만
+  if (!helpBox.hidden && !["Escape", "?"].includes(event.key)) return;
+  const command = commandForKey(event);
+  if (!command || event.repeat && !MOVES[command]) return; // 꾹 누르면 칸 옮기기만 이어서
+  event.preventDefault(); // 방향키·Space 로 화면이 스크롤되거나 Ctrl+S 로 저장 창이 뜨지 않게
+  runCommand(command);
+}
+
+addEventListener("keydown", handleKey);
 document.getElementById("save-btn").addEventListener("click", () => save());
 document.getElementById("idle-btn").addEventListener("click", () => setIdleMode(!idleMode));
+document.getElementById("help-btn").addEventListener("click", toggleHelp);
+helpBox.addEventListener("click", (event) => {
+  if (event.target === helpBox) toggleHelp(); // 바깥을 누르면 닫혀요
+});
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) tick(); // 돌아오자마자 비운 시간 처리
 });
@@ -440,7 +747,9 @@ window.addEventListener("pointerdown", unlockAudio);
 window.addEventListener("keydown", unlockAudio);
 
 // ── 시작 ──
-draw();
+draw(); // 도구 막대를 먼저 그려야 화면 크기를 맞출 수 있어요
+setIdleMode(idleMode); // 버튼 글자와 화면 크기 맞추기 (fitScreen 포함)
+setTool("look");
 requestAnimationFrame(animate);
 if (boot.recovery) {
   showToast(

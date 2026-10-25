@@ -4,7 +4,7 @@
 //
 // 그리는 순서: 배경(풀·나무·헛간) → 창고(상자·자루)·고양이 → 밭과 작물 → 사람·드론
 //   → 계절 색조 → 날씨 색조 → 하루의 빛 → 밤 불빛과 별 → 무지개 → 나비 → 계절 입자 → 비·눈 → 선택 표시
-// scene = { layout, state, speciesList, speciesById, palette, sprites, selectedId, preview, animator, cat, time }
+// scene = { layout, state, speciesList, speciesById, palette, sprites, selectedId, hoverId, preview, animator, cat, time }
 //   time: 애니메이션용 시각(ms). 흔들리는 작물, 계절 효과가 이 값으로 움직여요.
 import { borderColor, cropColor, mixColors } from "../decor/palette.js";
 import { lightAt } from "../decor/daylight.js";
@@ -69,6 +69,13 @@ export function drawFarm(ctx, scene) {
   if (sunnyDay && (season === "spring" || season === "summer")) drawButterflies(ctx, layout, time);
   drawParticles(ctx, season, look.particle, time);
   drawPrecipitation(ctx, weather, time);
+  // 마우스가 올라간 칸은 옅게, 고른 칸(키보드 커서)은 또렷하게
+  const hovered = state.plots.find((p) => p.id === scene.hoverId);
+  if (hovered && hovered.id !== selectedId) {
+    ctx.globalAlpha = 0.5;
+    drawSelection(ctx, layout.farm.x + hovered.x * TILE, layout.farm.y + hovered.y * TILE);
+    ctx.globalAlpha = 1;
+  }
   const selected = state.plots.find((p) => p.id === selectedId);
   if (selected) drawSelection(ctx, layout.farm.x + selected.x * TILE, layout.farm.y + selected.y * TILE);
 }

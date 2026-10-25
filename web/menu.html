@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>힐링 농장 · 메뉴</title>
+    <link rel="stylesheet" href="/web/style.css" />
+  </head>
+  <body class="menu-window">
+    <!-- 이 창은 비어 있다가, 농장 창(main.js)이 메뉴를 그려 넣어요. 다른 모니터로 옮겨서 쓰세요. -->
+    <aside id="panel"><p class="hint">농장 창과 연결하는 중…</p></aside>
+    <div id="tip" hidden></div>
+    <script>
+      // 농장 창에 "메뉴 창이 준비됐어요" 하고 알려요. 그러면 농장 창이 이 창에 메뉴를 그려 넣어요.
+      if (window.opener) window.opener.postMessage({ type: "menu-ready" }, location.origin);
+    </script>
+  </body>
+</html>

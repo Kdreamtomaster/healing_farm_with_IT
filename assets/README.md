@@ -41,6 +41,7 @@ assets/
 │   ├── crate_1.png   ← 수확물 상자 (위에 수확물이 쌓임)
 │   ├── sack_1.png    ← 씨앗 자루 (띠는 표시색 → 작물 색으로, 12×12)
 │   └── stove_1.png, stove_2.png ← 냄비 올린 화덕 (불꽃 2프레임)
+├── ui/               ← 도구 막대 아이콘 (돋보기, 물뿌리개, 씨앗 주머니, 바구니, 스프링클러, 물길)
 ├── dishes/           ← 요리 그림 (data/recipes.json 의 id 와 같은 이름)
 │   └── caprese.png, potato_soup.png, … (8가지)
 └── effects/

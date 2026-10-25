@@ -44,6 +44,7 @@ python -m unittest discover -s tests/server -t tests/server
 | `web/cooking.test.js` | 요리 재료 소비·모자란 재료·끓는 동안 재료 중복 방지·나눠 먹기 |
 | `web/weather.test.js` | 같은 날은 같은 날씨, 비 시간대, 겨울엔 눈, 흐림→비→무지개, 비가 흙을 알맞게, 하루의 빛 |
 | `web/nature.test.js` | 새소리·풀벌레·빗소리가 실제로 (작게) 나는지 |
+| `web/controls.test.js` | 도구별 할 일, 알맞은 일 순서, 씨앗 기억·넘기기, 단축키(글자 입력 중엔 무시), 키보드 커서 |
 | `web/index.html`, `web/runner.js` | 브라우저용 작은 테스트 도구 |
 
 서버 테스트는 실제 `saves/` 대신 임시 폴더(`…/내 게임/힐링 농장/`)를 써서 내 세이브를 건드리지 않아요.
