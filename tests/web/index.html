@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>힐링 농장 규칙 테스트</title>
+    <style>
+      body { font-family: sans-serif; margin: 24px; background: #f6efe2; color: #4a3b2a; }
+      li.ok::marker { content: "✅ "; }
+      li.fail::marker { content: "❌ "; }
+      li.fail { color: #c8553d; }
+    </style>
+  </head>
+  <body>
+    <h1>힐링 농장 규칙 테스트</h1>
+    <p>서버를 켠 뒤 <code>http://127.0.0.1:8765/tests/web/</code> 로 열어 보세요.</p>
+    <p id="summary">테스트 중…</p>
+    <ul id="results"></ul>
+    <script type="module">
+      import { results } from "./runner.js";
+      import "./farm.test.js";
+
+      const list = document.getElementById("results");
+      for (const r of results) {
+        const li = document.createElement("li");
+        li.className = r.ok ? "ok" : "fail";
+        li.textContent = r.ok ? r.name : `${r.name} — ${r.error}`;
+        list.append(li);
+      }
+      const passed = results.filter((r) => r.ok).length;
+      const summary = `${results.length}개 중 ${passed}개 통과`;
+      document.getElementById("summary").textContent = summary;
+      document.title = passed === results.length ? `PASS ${summary}` : `FAIL ${summary}`;
+      window.testResults = results;
+    </script>
+  </body>
+</html>

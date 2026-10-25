@@ -1,0 +1,44 @@
+{
+  "crops": [
+    {
+      "id": "tomato",
+      "name": { "ko": "토마토", "en": "Tomato" },
+      "type": "field",
+      "water": "high",
+      "growMinutes": 240,
+      "yield": 3,
+      "seeds": 2,
+      "colors": ["#d9483b"]
+    },
+    {
+      "id": "potato",
+      "name": { "ko": "감자", "en": "Potato" },
+      "type": "field",
+      "water": "low",
+      "growMinutes": 180,
+      "yield": 4,
+      "seeds": 2,
+      "colors": ["#c9a25e"]
+    },
+    {
+      "id": "rice",
+      "name": { "ko": "벼", "en": "Rice" },
+      "type": "paddy",
+      "water": "high",
+      "growMinutes": 360,
+      "yield": 5,
+      "seeds": 2,
+      "colors": ["#e8c84a"]
+    },
+    {
+      "id": "tulip",
+      "name": { "ko": "튤립", "en": "Tulip" },
+      "type": "flower",
+      "water": "mid",
+      "growMinutes": 120,
+      "yield": 1,
+      "seeds": 2,
+      "colors": ["#e86f9a"]
+    }
+  ]
+}

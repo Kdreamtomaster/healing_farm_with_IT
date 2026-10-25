@@ -20,6 +20,20 @@
 - **연구소**: 연구소 작물이 선물 재료로 쓰이지 않는가
 - **DAG**: 순환 연결을 거부하는가, 실패한 작업이 정해진 횟수만큼 재시도되는가
 
-## 들어올 파일 (예정)
-- `server/test_storage.py`, `server/test_integrity.py`
-- `web/index.html`, `web/*.test.js`
+## 실행하기
+```bash
+# 서버 테스트 (프로젝트 폴더에서)
+python -m unittest discover -s tests/server -t tests/server
+```
+게임 규칙 테스트는 `python server/main.py` 로 서버를 켠 뒤 Chrome에서 `http://127.0.0.1:8765/tests/web/` 를 엽니다.
+
+## 파일
+| 파일 | 확인하는 것 |
+|---|---|
+| `server/test_storage.py` | 한글 경로 새 농장, 저장 후 재실행 복원, 구획 배치 변경 거부, 깨진 파일 백업 복구, 백업 5개 유지 |
+| `server/test_integrity.py` | 지문 계산, 세이브 직접 수정 감지와 저장 잠금, 키 삭제 감지 |
+| `server/test_api.py` | 경로 조작 차단, 입력 검증, 다른 웹사이트 요청 차단, 저장 왕복 |
+| `web/farm.test.js` | 성장, 수분, 시듦, 심기, 수확, 일괄 관리 |
+| `web/index.html`, `web/runner.js` | 브라우저용 작은 테스트 도구 |
+
+서버 테스트는 실제 `saves/` 대신 임시 폴더(`…/내 게임/힐링 농장/`)를 써서 내 세이브를 건드리지 않아요.

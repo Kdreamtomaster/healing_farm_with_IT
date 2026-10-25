@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>힐링 농장</title>
+    <link rel="stylesheet" href="/web/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>🌱 힐링 농장</h1>
+      <span id="clock"></span>
+      <span id="integrity-badge" class="badge" hidden>⚠ 무결성 이상: 저장이 잠겼어요</span>
+      <span class="spacer"></span>
+      <span id="save-status"></span>
+      <button id="save-btn">저장</button>
+    </header>
+    <main>
+      <canvas id="farm"></canvas>
+      <aside id="panel"></aside>
+    </main>
+    <div id="toast" role="status"></div>
+    <script type="module" src="/web/main.js"></script>
+  </body>
+</html>

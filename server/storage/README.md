@@ -39,11 +39,16 @@
 - 세이브 위치는 항상 `프로젝트 폴더/saves/` (상대 경로)
 - 경로는 `pathlib.Path`로만 다루고 문자열 이어 붙이기를 하지 않음 → 한글·영어·공백이 섞인 폴더에서도 동작
 
-## 들어올 파일 (예정)
-- `schema.sql` — 표 만들기 SQL
-- `db.py` — 열기, 저장, 불러오기
-- `backup.py` — 스냅샷 만들기와 복구
-- `migrations/` — 버전별 표 구조 변경
+## 파일
+| 파일 | 하는 일 | 상태 |
+|---|---|---|
+| `schema.sql` | 표 만들기 SQL | ✔ |
+| `db.py` | 연결, 표 읽기/쓰기 | ✔ |
+| `backup.py` | 스냅샷(최근 5개), 깨진 파일 격리(`saves/broken/`), 복구 | ✔ |
+| `store.py` | 위 기능과 해시 검증을 묶어 실행·저장·복구 순서를 관리 | ✔ |
+| `migrations/` | 버전별 표 구조 변경 | 예정 |
+
+새 농장은 임시 파일(`farm.sqlite.new`)에 다 만든 뒤 이름을 바꿔 넣습니다. 만드는 도중 꺼져도 반쯤 만들어진 세이브가 남지 않아요.
 
 ## 더 읽기
 - [docs/learn/02-database-and-storage.md](../../docs/learn/02-database-and-storage.md)

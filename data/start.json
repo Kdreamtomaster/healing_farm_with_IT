@@ -1,0 +1,16 @@
+{
+  "timeScale": 30,
+  "layout": [
+    "FFFFFFFF",
+    "FFFFFFFF",
+    "PPPPPPPP",
+    "BBBBBBBB"
+  ],
+  "legend": { "F": "field", "P": "paddy", "B": "flowerbed" },
+  "inventory": {
+    "seed_tomato": 4,
+    "seed_potato": 4,
+    "seed_rice": 4,
+    "seed_tulip": 4
+  }
+}
